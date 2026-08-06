@@ -112,4 +112,139 @@ extension _TransformTools on _FigureCanvasState {
       return;
     }
   }
+
+  bool _handleRotateStart(Offset w, Figure fig) {
+    final ptHit = _hitTestPoint(w);
+    if (ptHit < 0) {
+      widget.controller.setSelectedPoint(null);
+      widget.controller.setSelectedSegment(null);
+      return false;
+    }
+    widget.controller.setSelectedPoint(ptHit);
+    final seg = _segmentTouching(fig, ptHit);
+    widget.controller.setSelectedSegment(seg?.id);
+
+    final comp = fig.connectedComponent(ptHit);
+    if (comp.length < 2) {
+      widget.controller.forceUpdate();
+      return false;
+    }
+    final adj = <int, List<int>>{};
+    for (final i in comp) {
+      adj[i] = [];
+    }
+    var edgeCount = 0;
+    for (final s in fig.segments) {
+      if (!comp.contains(s.point1Index) || !comp.contains(s.point2Index)) {
+        continue;
+      }
+      adj[s.point1Index]!.add(s.point2Index);
+      adj[s.point2Index]!.add(s.point1Index);
+      edgeCount++;
+    }
+
+    final isCycle = edgeCount >= comp.length;
+
+    int centre;
+    List<int> rotPts;
+    if (isCycle) {
+      final allRoots = fig.getFigureRoots();
+      final depth = <int, int>{};
+      final queue = <int>[];
+      for (final r in allRoots) {
+        if (r < 0 || r >= fig.points.length) continue;
+        depth[r] = 0;
+        queue.add(r);
+      }
+      while (queue.isNotEmpty) {
+        final cur = queue.removeAt(0);
+        for (final other in adj[cur]!) {
+          if (depth.containsKey(other)) continue;
+          depth[other] = depth[cur]! + 1;
+          queue.add(other);
+        }
+      }
+      int pivotNode = ptHit;
+      var bestDepth = depth[ptHit] ?? 0;
+      for (final i in comp) {
+        final d = depth[i];
+        if (d == null || allRoots.contains(i)) continue;
+        if (d < bestDepth) {
+          bestDepth = d;
+          pivotNode = i;
+        }
+      }
+      centre = ptHit == pivotNode
+          ? (seg != null
+              ? (seg.point1Index == ptHit ? seg.point2Index : seg.point1Index)
+              : (adj[ptHit]!.isNotEmpty ? adj[ptHit]!.first : ptHit))
+          : pivotNode;
+      rotPts = comp.where((i) => !allRoots.contains(i)).toList();
+    } else {
+      final allRoots = fig.getFigureRoots();
+      final parent = <int, int>{};
+      final visited = <int>{};
+      final queue = <int>[];
+      for (final r in allRoots) {
+        if (r < 0 || r >= fig.points.length) continue;
+        visited.add(r);
+        queue.add(r);
+      }
+      while (queue.isNotEmpty) {
+        final cur = queue.removeAt(0);
+        for (final other in adj[cur]!) {
+          if (visited.contains(other)) continue;
+          visited.add(other);
+          parent[other] = cur;
+          queue.add(other);
+        }
+      }
+      centre = parent[ptHit] ?? (seg?.point1Index == ptHit ? seg!.point2Index : seg!.point1Index);
+      final rot = <int>[];
+      final stk = <int>[ptHit];
+      while (stk.isNotEmpty) {
+        final cur = stk.removeLast();
+        if (rot.contains(cur)) continue;
+        rot.add(cur);
+        for (final other in adj[cur]!) {
+          if (parent[other] == cur) stk.add(other);
+        }
+      }
+      rotPts = rot;
+    }
+    if (rotPts.isEmpty || centre < 0 || centre >= fig.points.length) {
+      widget.controller.forceUpdate();
+      return false;
+    }
+    final px = fig.points[centre].x;
+    final py = fig.points[centre].y;
+    final ias = rotPts
+        .map((i) => math.atan2(fig.points[i].y - py, fig.points[i].x - px))
+        .toList();
+    final ids = rotPts
+        .map((i) => math.sqrt((fig.points[i].x - px) * (fig.points[i].x - px) +
+            (fig.points[i].y - py) * (fig.points[i].y - py)))
+        .toList();
+    final origCtrl = <String, _Ctrl>{};
+    for (final s in fig.segments) {
+      if (s.curved && s.controlDX != null && s.controlDY != null) {
+        origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+      }
+    }
+    _captureAnchorForPoint(fig, ptHit, all: true);
+    _drag
+      ..reset()
+      ..active = true
+      ..rotating = true
+      ..pivot = centre
+      ..connPts = rotPts
+      ..initAngles = ias
+      ..initDists = ids
+      ..startAngle = math.atan2(w.dy - py, w.dx - px)
+      ..startPtX = px
+      ..startPtY = py
+      ..fkCtrl = origCtrl;
+    widget.controller.forceUpdate();
+    return true;
+  }
 }
