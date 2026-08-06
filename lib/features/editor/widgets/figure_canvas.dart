@@ -12,6 +12,12 @@ import '../../../core/theme/app_theme.dart';
 
 part 'figure_canvas_types.dart';
 part 'figure_canvas_painter.dart';
+part 'tools/select_join_tool.dart';
+part 'tools/point_modify_tool.dart';
+part 'tools/transform_tools.dart';
+part 'tools/curve_tool.dart';
+part 'tools/draw_tool.dart';
+part 'tools/asset_tool.dart';
 
 /// The interactive canvas, the Flutter analog of `FigureCanvasArea.tsx`.
 class FigureCanvas extends StatefulWidget {
@@ -362,349 +368,24 @@ class _FigureCanvasState extends State<FigureCanvas> {
       widget.controller.stopPlayback();
     }
 
-    if (tool == EditorTool.join) {
-      final ptHit = _hitTestPoint(w);
-      if (ptHit >= 0) {
-        widget.controller.setSelectedPoint(ptHit);
-        final cs = _segmentTouching(fig, ptHit);
-        widget.controller.setSelectedSegment(cs?.id);
-        _drag
-          ..reset()
-          ..active = true
-          ..isPoint = true
-          ..ptIdx = ptHit
-          ..startX = w.dx
-          ..startY = w.dy
-          ..startPtX = fig.points[ptHit].x
-          ..startPtY = fig.points[ptHit].y;
-        widget.controller.forceUpdate();
-        return;
-      }
-    }
+    // Delegate to tools
+    handleSelectJoinStart(w, tool, fig);
+    if (_drag.active) return;
 
-    final rootHit = _hitTestPoint(w);
-    final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
-    if (tool == EditorTool.select &&
-        roots.contains(rootHit)) {
-      final allC = _findConnectedPoints(fig, rootHit)..add(rootHit);
-      final init = <int, Point2>{};
-      for (final i in allC) {
-        init[i] = fig.points[i].clone();
-      }
-      widget.controller.setSelectedPoint(rootHit);
-      final cs = _segmentTouching(fig, rootHit);
-      widget.controller.setSelectedSegment(cs?.id);
-      _drag
-        ..reset()
-        ..active = true
-        ..isPoint = true
-        ..ptIdx = rootHit
-        ..startX = w.dx
-        ..startY = w.dy
-        ..startPtX = fig.points[rootHit].x
-        ..startPtY = fig.points[rootHit].y
-        ..connPts = allC
-        ..fkInit = init;
-      widget.controller.forceUpdate();
-      return;
-    }
+    handlePointModifyStart(w, tool, fig);
+    if (_drag.active) return;
 
-    if (tool == EditorTool.point) {
-      final ptHit = _hitTestPoint(w);
-      if (ptHit >= 0) {
-        widget.controller.setSelectedPoint(ptHit);
-        final cs = _segmentTouching(fig, ptHit);
-        widget.controller.setSelectedSegment(cs?.id);
-        final moving = <int>[ptHit, ...fig.childPoints(ptHit)];
-        final init = <int, Point2>{};
-        for (final i in moving) {
-          init[i] = fig.points[i].clone();
-        }
-        _drag
-          ..reset()
-          ..active = true
-          ..isPoint = true
-          ..ptIdx = ptHit
-          ..startX = w.dx
-          ..startY = w.dy
-          ..startPtX = fig.points[ptHit].x
-          ..startPtY = fig.points[ptHit].y
-          ..connPts = moving
-          ..fkInit = init;
-        _captureAnchorForPoint(fig, ptHit);
-        widget.controller.forceUpdate();
-        return;
-      }
-    }
+    handleTransformStart(w, tool, fig, cam);
+    if (_drag.active) return;
 
-    if (tool == EditorTool.modify) {
-      final ptHit = _hitTestPoint(w);
-      if (ptHit >= 0) {
-        widget.controller.setSelectedPoint(ptHit);
-        final cs = _segmentTouching(fig, ptHit);
-        widget.controller.setSelectedSegment(cs?.id);
-        _drag
-          ..reset()
-          ..active = true
-          ..isPoint = true
-          ..ptIdx = ptHit
-          ..startX = w.dx
-          ..startY = w.dy
-          ..startPtX = fig.points[ptHit].x
-          ..startPtY = fig.points[ptHit].y;
-        _captureAnchorForPoint(fig, ptHit, all: true);
-        return;
-      }
-    }
+    handleCurveStart(w, tool, fig, cam);
+    if (_drag.active) return;
 
-    if (tool == EditorTool.select) {
-      final ptHit = _hitTestPoint(w);
-      if (ptHit >= 0) {
-        final allC = _findConnectedPoints(fig, ptHit)..add(ptHit);
-        widget.controller.setSelectedPoint(ptHit);
-        final cs = _segmentTouching(fig, ptHit);
-        widget.controller.setSelectedSegment(cs?.id);
-        final init = <int, Point2>{};
-        for (final i in allC) {
-          init[i] = fig.points[i].clone();
-        }
-        _drag
-          ..reset()
-          ..active = true
-          ..isPoint = true
-          ..ptIdx = ptHit
-          ..startX = w.dx
-          ..startY = w.dy
-          ..startPtX = fig.points[ptHit].x
-          ..startPtY = fig.points[ptHit].y
-          ..connPts = allC
-          ..fkInit = init;
-        _captureAnchorForPoint(fig, ptHit, all: true);
-        widget.controller.forceUpdate();
-        return;
-      }
-      widget.controller.setSelectedPoint(null);
-      final segHit = _hitTestSegment(w);
-      widget.controller.setSelectedSegment(segHit);
-    }
+    handleAssetStart(w, tool, fig);
+    if (_drag.active) return;
 
-    if (tool == EditorTool.rotate) {
-      if (_handleRotateStart(w, fig)) return;
-    }
-
-    if (tool == EditorTool.stretch) {
-      final ptHit = _hitTestPoint(w);
-      if (ptHit < 0) {
-        widget.controller.setSelectedPoint(null);
-        widget.controller.setSelectedSegment(null);
-        return;
-      }
-      widget.controller.setSelectedPoint(ptHit);
-      final sf = _segmentTouching(fig, ptHit);
-      widget.controller.setSelectedSegment(sf?.id);
-      // Scale is centred on the figure's root so the root point never moves.
-      int root = ptHit;
-      for (final r in fig.getFigureRoots()) {
-        if (r >= 0 &&
-            r < fig.points.length &&
-            fig.connectedComponent(r).contains(ptHit)) {
-          root = r;
-          break;
-        }
-      }
-      final rx = fig.points[root].x;
-      final ry = fig.points[root].y;
-      final comp = fig.connectedComponent(root).toList()..sort();
-      final angles = <double>[];
-      final dists = <double>[];
-      for (final i in comp) {
-        dists.add(math.sqrt(
-            (fig.points[i].x - rx) * (fig.points[i].x - rx) +
-                (fig.points[i].y - ry) * (fig.points[i].y - ry)));
-        angles.add(
-            math.atan2(fig.points[i].y - ry, fig.points[i].x - rx));
-      }
-      final startDist =
-          math.sqrt((w.dx - rx) * (w.dx - rx) + (w.dy - ry) * (w.dy - ry));
-      final origCtrl = <String, _Ctrl>{};
-      for (final s in fig.segments) {
-        if (s.curved && s.controlDX != null && s.controlDY != null) {
-          origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
-        }
-      }
-      _captureAnchorForPoint(fig, root, all: true);
-      _drag
-        ..reset()
-        ..active = true
-        ..isPoint = false
-        ..stretching = true
-        ..pivot = root
-        ..connPts = comp
-        ..initAngles = angles
-        ..initDists = dists
-        ..startDist = startDist > 0.001 ? startDist : 1
-        ..fkCtrl = origCtrl
-        ..startX = w.dx
-        ..startY = w.dy;
-      widget.controller.forceUpdate();
-      return;
-    }
-
-    if (tool == EditorTool.rotateAll) {
-      if (fig.points.length < 2) return;
-      // Rotate only the connected component (one root) of the selected
-      // segment; other roots stay untouched.
-      int root = 0;
-      final selId = widget.controller.selectedSegmentId;
-      if (selId != null) {
-        final selSeg = fig.getSegment(selId);
-        if (selSeg != null && selSeg.point1Index < fig.points.length) {
-          root = _rootOfPoint(fig, selSeg.point1Index);
-        }
-      } else {
-        final roots = fig.getFigureRoots();
-        if (roots.isNotEmpty && roots.first < fig.points.length) {
-          root = roots.first;
-        }
-      }
-      final comp = fig.connectedComponent(root).toList()..sort();
-      final cx = fig.points[root].x;
-      final cy = fig.points[root].y;
-      final ias = comp
-          .map((i) => math.atan2(fig.points[i].y - cy, fig.points[i].x - cx))
-          .toList();
-      final ids = comp
-          .map((i) => math.sqrt(
-              (fig.points[i].x - cx) * (fig.points[i].x - cx) +
-                  (fig.points[i].y - cy) * (fig.points[i].y - cy)))
-          .toList();
-      final origCtrl = <String, _Ctrl>{};
-      for (final s in fig.segments) {
-        if (s.curved && s.controlDX != null && s.controlDY != null) {
-          origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
-        }
-      }
-      _captureAnchorForPoint(fig, root, all: true);
-      _drag
-        ..reset()
-        ..active = true
-        ..rotating = true
-        ..pivot = root
-        ..connPts = comp
-        ..initAngles = ias
-        ..initDists = ids
-        ..startAngle = math.atan2(w.dy - cy, w.dx - cx)
-        ..startPtX = cx
-        ..startPtY = cy
-        ..fkCtrl = origCtrl;
-      widget.controller.forceUpdate();
-      return;
-    }
-
-    if (tool == EditorTool.curve) {
-      for (final s in fig.segments) {
-        if (!s.curved || s.controlDX == null) continue;
-        final mx = (fig.points[s.point1Index].x + fig.points[s.point2Index].x) /
-            2;
-        final my = (fig.points[s.point1Index].y + fig.points[s.point2Index].y) /
-            2;
-        final cx = mx + s.controlDX!;
-        final cy = my + s.controlDY!;
-        if (math.sqrt((w.dx - cx) * (w.dx - cx) + (w.dy - cy) * (w.dy - cy)) <
-            12 / cam.zoom) {
-          widget.controller.setSelectedSegment(s.id);
-          _drag
-            ..reset()
-            ..active = true
-            ..segId = s.id
-            ..curving = true
-            ..startX = w.dx
-            ..startY = w.dy
-            ..startPtX = s.controlDX!
-            ..startPtY = s.controlDY!;
-          return;
-        }
-      }
-      final segHit = _hitTestSegment(w);
-      if (segHit != null) {
-        final seg = fig.getSegment(segHit);
-        if (seg == null || seg.type != 'line') return;
-        if (seg.curved && seg.controlDX != null) {
-          seg.curved = false;
-          seg.controlDX = null;
-          seg.controlDY = null;
-          widget.controller.setSelectedSegment(null);
-          widget.controller.setSelectedPoint(null);
-          widget.controller.forceUpdate();
-          widget.controller.pushHistory();
-          return;
-        }
-        seg.curved = true;
-        seg.controlDX = 0;
-        seg.controlDY = 0;
-        widget.controller.setSelectedSegment(segHit);
-        widget.controller.setSelectedPoint(null);
-        _drag
-          ..reset()
-          ..active = true
-          ..segId = segHit
-          ..curving = true
-          ..startX = w.dx
-          ..startY = w.dy;
-        widget.controller.forceUpdate();
-        widget.controller.pushHistory();
-        return;
-      }
-    }
-
-    if (tool == EditorTool.asset || widget.controller.isAssetMode) {
-      if (_handleAssetStart(w, fig)) return;
-    }
-
-    if (tool == EditorTool.line || tool == EditorTool.circle) {
-      final ptHit = _hitTestPoint(w);
-      if (ptHit < 0) {
-        if (fig.points.isEmpty) {
-          final idx = fig.addPoint(w.dx, w.dy);
-          _lastPt = idx;
-          widget.controller.forceUpdate();
-        }
-        return;
-      }
-      final last = _lastPt;
-      final alreadyConnected = last != null &&
-          fig.segments.any((s) =>
-              (s.point1Index == last && s.point2Index == ptHit) ||
-              (s.point1Index == ptHit && s.point2Index == last));
-      if (last != null && last != ptHit && !alreadyConnected) {
-        final seg = fig.createSegment(tool.name, last, ptHit);
-        widget.controller.setSelectedSegment(seg.id);
-        widget.controller.setSelectedPoint(ptHit);
-        _lastPt = ptHit;
-        widget.controller.forceUpdate();
-        widget.controller.pushHistory();
-        return;
-      }
-      final p2 = fig.addPoint(w.dx, w.dy);
-      final seg = fig.createSegment(tool.name, ptHit, p2);
-      _lastPt = p2;
-      widget.controller.setSelectedSegment(seg.id);
-      widget.controller.setSelectedPoint(p2);
-      _drag
-        ..reset()
-        ..active = true
-        ..isPoint = true
-        ..ptIdx = p2
-        ..creating = true
-        ..startX = w.dx
-        ..startY = w.dy
-        ..startPtX = w.dx
-        ..startPtY = w.dy
-        ..anchorX = fig.points[ptHit].x
-        ..anchorY = fig.points[ptHit].y;
-      widget.controller.forceUpdate();
-      return;
-    }
+    handleDrawStart(w, tool, fig);
+    if (_drag.active) return;
 
     // Default: pan.
     _drag
@@ -1110,13 +791,7 @@ final z = widget.controller.camera.zoom;
       widget.controller.forceUpdate();
     }
 
-    if (widget.controller.activeTool == EditorTool.join &&
-        d.isPoint &&
-        d.ptIdx >= 0 &&
-        d.ptIdx < fig.points.length &&
-        !d.jointDone) {
-      _handleJoinMove(fig, d, w);
-    }
+    handleSelectJoinMove(fig, d, w);
 
     if (d.isSegment && d.segId != null) {
       final seg = fig.getSegment(d.segId!);
