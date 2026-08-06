@@ -144,18 +144,13 @@ extension _TransformTools on _FigureCanvasState {
     }
 
     final isCycle = edgeCount >= comp.length;
+    final subRoot = _rootOfPoint(fig, ptHit);
 
     int centre;
     List<int> rotPts;
     if (isCycle) {
-      final allRoots = fig.getFigureRoots();
-      final depth = <int, int>{};
-      final queue = <int>[];
-      for (final r in allRoots) {
-        if (r < 0 || r >= fig.points.length) continue;
-        depth[r] = 0;
-        queue.add(r);
-      }
+      final depth = <int, int>{subRoot: 0};
+      final queue = <int>[subRoot];
       while (queue.isNotEmpty) {
         final cur = queue.removeAt(0);
         for (final other in adj[cur]!) {
@@ -165,10 +160,10 @@ extension _TransformTools on _FigureCanvasState {
         }
       }
       int pivotNode = ptHit;
-      var bestDepth = depth[ptHit] ?? 0;
+      var bestDepth = depth[ptHit] ?? 99999;
       for (final i in comp) {
         final d = depth[i];
-        if (d == null || allRoots.contains(i)) continue;
+        if (d == null || i == subRoot) continue;
         if (d < bestDepth) {
           bestDepth = d;
           pivotNode = i;
@@ -179,17 +174,11 @@ extension _TransformTools on _FigureCanvasState {
               ? (seg.point1Index == ptHit ? seg.point2Index : seg.point1Index)
               : (adj[ptHit]!.isNotEmpty ? adj[ptHit]!.first : ptHit))
           : pivotNode;
-      rotPts = comp.where((i) => !allRoots.contains(i)).toList();
+      rotPts = comp.where((i) => i != subRoot).toList();
     } else {
-      final allRoots = fig.getFigureRoots();
       final parent = <int, int>{};
-      final visited = <int>{};
-      final queue = <int>[];
-      for (final r in allRoots) {
-        if (r < 0 || r >= fig.points.length) continue;
-        visited.add(r);
-        queue.add(r);
-      }
+      final visited = <int>{subRoot};
+      final queue = <int>[subRoot];
       while (queue.isNotEmpty) {
         final cur = queue.removeAt(0);
         for (final other in adj[cur]!) {
