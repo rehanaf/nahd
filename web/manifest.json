@@ -1,11 +1,11 @@
 {
-    "name": "id_animate",
-    "short_name": "id_animate",
+    "name": "I'd Animate",
+    "short_name": "I'd Animate",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "I'd Animate - 2D Vector Animation Editor",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
