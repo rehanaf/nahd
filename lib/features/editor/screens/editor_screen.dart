@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 
 import '../../../core/models/figure.dart';
 import '../../../core/models/segment.dart';
 import '../../../core/project_storage.dart';
-import '../../../core/svg_import.dart';
 import '../controllers/editor_controller.dart';
+import '../controllers/editor_controller_svg_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/animation_settings_panel.dart';
 import '../widgets/animation_transport.dart';
@@ -249,147 +248,12 @@ class _EditorScreenState extends State<EditorScreen> {
         if (a == null || b == null) return;
         c.figure.cycleFills['$a,$b'] = entry.clone();
       });
-      _mergeGroupsFrom(src);
+      c.mergeGroupsFrom(src);
       c.forceUpdate();
       c.pushHistory();
     } catch (_) {
       // ignore
     }
-  }
-
-  /// Copies group/folder definitions from an imported [src] into the current
-  /// figure. Source segments are cloned with identical ids, so group segment
-  /// ids carry over directly. Any segment not covered by a copied group falls
-  /// back to the default group.
-  void _mergeGroupsFrom(Figure src) {
-    final c = widget.controller;
-    final present = {for (final s in c.figure.segments) s.id};
-    for (final g in src.groups) {
-      if (g.id == Figure.defaultGroupId) continue;
-      final ids = g.segmentIds.where(present.contains).toList();
-      if (ids.isEmpty) continue;
-      c.figure.groups.add(LayerGroup(
-        name: g.name,
-        segmentIds: ids,
-        visible: g.visible,
-        locked: g.locked,
-      ));
-    }
-    c.figure.ensureDefaultGroup();
-    c.figure.ensureSegmentsInDefaultGroup();
-  }
-
-  Future<void> _handleImportSvg() async {
-    final c = widget.controller;
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['svg'],
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.single;
-      if (file.bytes == null) return;
-      final svgText = String.fromCharCodes(file.bytes!);
-      if (svgText.isEmpty) return;
-
-      final src = parseSvgFigure(
-        svgText,
-        canvasWidth: c.figure.canvasWidth,
-        canvasHeight: c.figure.canvasHeight,
-      );
-      if (src.points.isEmpty) {
-        _showSnack('No drawable shapes found in the SVG');
-        return;
-      }
-      _mergeImportedFigure(src, 'Imported ${src.rootIndices.length} layer(s) from SVG');
-    } catch (e) {
-      _showSnack('SVG import failed: $e');
-    }
-  }
-
-  /// Import SVG as raster assets: each layer becomes a single image segment.
-  Future<void> _handleImportSvgAsImage() async {
-    final c = widget.controller;
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['svg'],
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.single;
-      if (file.bytes == null) return;
-      final svgText = String.fromCharCodes(file.bytes!);
-      if (svgText.isEmpty) return;
-
-      final src = await parseSvgFigureAsAssets(
-        svgText,
-        canvasWidth: c.figure.canvasWidth,
-        canvasHeight: c.figure.canvasHeight,
-      );
-      if (src.points.isEmpty) {
-        _showSnack('No drawable shapes found in the SVG');
-        return;
-      }
-      _mergeImportedFigure(src, 'Imported ${src.rootIndices.length} layer(s) as images');
-    } catch (e) {
-      _showSnack('SVG import failed: $e');
-    }
-  }
-
-  /// Merges an imported [Figure] into the current figure, placed to the right
-  /// of existing content, registering each imported root.
-  void _mergeImportedFigure(Figure src, String message) {
-    final c = widget.controller;
-    final srcPts = src.points;
-    final xs = srcPts.map((p) => p.x).toList();
-    final ys = srcPts.map((p) => p.y).toList();
-    final minX = xs.reduce((a, b) => a < b ? a : b);
-    final minY = ys.reduce((a, b) => a < b ? a : b);
-    final maxY = ys.reduce((a, b) => a > b ? a : b);
-    final curMaxX = c.figure.points.isEmpty
-        ? -100
-        : c.figure.points.map((p) => p.x).reduce((a, b) => a > b ? a : b);
-    final offsetX = curMaxX + 100 - minX;
-    final offsetY = -((minY + maxY) / 2);
-
-    final indexMap = <int, int>{};
-    final base = c.figure.points.length;
-    for (var i = 0; i < srcPts.length; i++) {
-      indexMap[i] = base + i;
-      c.figure.points.add(Point2(srcPts[i].x + offsetX, srcPts[i].y + offsetY));
-    }
-    final roots = c.figure.rootIndices;
-    final newRoots = <int>[];
-    for (final r in src.rootIndices) {
-      final mapped = indexMap[r];
-      if (mapped == null) continue;
-      newRoots.add(mapped);
-      if (!roots.contains(mapped)) roots.add(mapped);
-    }
-    if (c.isAnimateMode) {
-      for (final r in newRoots) {
-        if (c.currentTime > 0.001) {
-          c.figure.setFigureVisibility(r, 0, false);
-        }
-        c.figure.setFigureVisibility(r, c.currentTime, true);
-      }
-    }
-    for (final s in src.segments) {
-      final p1 = indexMap[s.point1Index];
-      final p2 = indexMap[s.point2Index];
-      if (p1 == null || p2 == null) continue;
-      final ns = s.clone();
-      ns.point1Index = p1;
-      ns.point2Index = p2;
-      ns.layer = ns.layer + c.figure.segments.length;
-      c.figure.segments.add(ns);
-    }
-    _mergeGroupsFrom(src);
-    c.forceUpdate();
-    c.pushHistory();
-    _showSnack(message);
   }
 
   void _showSnack(String message) {
@@ -793,7 +657,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       label: 'Import SVG',
                       onTap: () {
                         setState(() => _showMenu = false);
-                        _handleImportSvg();
+                        widget.controller.importSvg().then((msg) {
+                          if (msg != null) _showSnack(msg);
+                        });
                       },
                     ),
                     _MenuItem(
@@ -801,7 +667,9 @@ class _EditorScreenState extends State<EditorScreen> {
                       label: 'Import SVG as Image',
                       onTap: () {
                         setState(() => _showMenu = false);
-                        _handleImportSvgAsImage();
+                        widget.controller.importSvgAsImage().then((msg) {
+                          if (msg != null) _showSnack(msg);
+                        });
                       },
                     ),
                     _MenuItem(

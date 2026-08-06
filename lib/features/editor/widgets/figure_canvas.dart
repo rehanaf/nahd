@@ -397,139 +397,6 @@ class _FigureCanvasState extends State<FigureCanvas> {
       ..startCamY = cam.y;
   }
 
-  Segment? _selectedAssetSegment() {
-    final id = widget.controller.assetSegmentId ??
-        widget.controller.selectedSegmentId;
-    if (id == null) return null;
-    final seg = widget.controller.figure.getSegment(id);
-    if (seg == null || !seg.isImage) return null;
-    return seg;
-  }
-
-  bool _handleAssetStart(Offset w, Figure fig) {
-    // If there's a selected image segment, try to grab a handle first.
-    final seg = _selectedAssetSegment();
-    if (seg != null &&
-        seg.point1Index < fig.points.length &&
-        seg.point2Index < fig.points.length) {
-      final p1 = fig.points[seg.point1Index];
-      final p2 = fig.points[seg.point2Index];
-      final image = _imageFor(seg.imageData);
-      final size = _resolveImageSize(seg, image);
-      final mx = (p1.x + p2.x) / 2 + seg.imageOffsetX;
-      final my = (p1.y + p2.y) / 2 + seg.imageOffsetY;
-      final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-      final rotate = segAngle + seg.imageRotate * math.pi / 180;
-      final handles = _assetHandles(size.width / 2, size.height / 2, rotate, mx, my);
-
-final z = widget.controller.camera.zoom;
-      const hitR = 12.0 / 1.0; // in world units; scaled below
-      // Find grabbed handle.
-      for (var i = 0; i < handles.length; i++) {
-        final dx = w.dx - handles[i].dx;
-        final dy = w.dy - handles[i].dy;
-        if (dx * dx + dy * dy < (hitR * hitR) / (z * z)) {
-          final isRot = i == 8;
-          _drag
-            ..reset()
-            ..active = true
-            ..assetDrag = true
-            ..assetOp = isRot ? 'rotate' : 'resize'
-            ..assetHandle = i
-            ..startOx = seg.imageOffsetX
-            ..startOy = seg.imageOffsetY
-            ..startRot = seg.imageRotate
-            ..startW = size.width
-            ..startH = size.height
-            ..assetCenterX = mx
-            ..assetCenterY = my
-            ..startAngle = math.atan2(w.dy - my, w.dx - mx)
-            ..startX = w.dx
-            ..startY = w.dy;
-          widget.controller.selectAssetSegment(seg.id);
-          widget.controller.forceUpdate();
-          return true;
-        }
-      }
-      // Check if tap is inside the box -> move.
-      final inside = _pointInRotatedRect(
-        w,
-        handles.take(8).toList(),
-        mx,
-        my,
-        rotate,
-      );
-      if (inside) {
-        _drag
-          ..reset()
-          ..active = true
-          ..assetDrag = true
-          ..assetOp = 'move'
-          ..startOx = seg.imageOffsetX
-          ..startOy = seg.imageOffsetY
-          ..startX = w.dx
-          ..startY = w.dy;
-        widget.controller.selectAssetSegment(seg.id);
-        widget.controller.forceUpdate();
-        return true;
-      }
-    }
-
-    // Otherwise, try to select an image segment under the pointer.
-    final hit = _hitTestImageSegment(w, fig);
-    if (hit != null) {
-      widget.controller.selectAssetSegment(hit);
-      widget.controller.forceUpdate();
-      return true;
-    }
-    // Nothing grabbed: let the caller fall through to the normal rig tool so
-    // rig editing still works in asset mode.
-    return false;
-  }
-
-  bool _pointInRotatedRect(
-      Offset w, List<Offset> corners, double cx, double cy, double rotate) {
-    if (corners.length < 4) return false;
-    final cosR = math.cos(rotate), sinR = math.sin(rotate);
-    final dx = w.dx - cx, dy = w.dy - cy;
-    final lx = dx * cosR + dy * sinR;
-    final ly = -dx * sinR + dy * cosR;
-    // corners order: TR(0),TC(1),TL(2),LC(3),BL(4),BC(5),BR(6),RC(7).
-    // Use corners[0] (TR) and corners[4] (BL) for full half extents.
-    final hr = corners[0];
-    final bl = corners[4];
-    final hw = (hr.dx - bl.dx).abs() / 2;
-    final hh = (hr.dy - bl.dy).abs() / 2;
-    return lx >= -hw && lx <= hw && ly >= -hh && ly <= hh;
-  }
-
-  String? _hitTestImageSegment(Offset w, Figure fig) {
-    for (var i = fig.segments.length - 1; i >= 0; i--) {
-      final s = fig.segments[i];
-      if (!s.isImage || s.imageData == null) continue;
-      if (s.point1Index >= fig.points.length || s.point2Index >= fig.points.length) {
-        continue;
-      }
-      final p1 = fig.points[s.point1Index];
-      final p2 = fig.points[s.point2Index];
-      final image = _imageFor(s.imageData);
-      final size = _resolveImageSize(s, image);
-      final mx = (p1.x + p2.x) / 2 + s.imageOffsetX;
-      final my = (p1.y + p2.y) / 2 + s.imageOffsetY;
-      final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-      final rotate = segAngle + s.imageRotate * math.pi / 180;
-      final corners = _assetHandles(size.width / 2, size.height / 2, rotate, mx, my);
-      if (_pointInRotatedRect(w, corners.take(8).toList(), mx, my, rotate)) {
-        return s.id;
-      }
-    }
-    return null;
-  }
-
-  /// In anchor mode, records the current image center/rotation of every image
-  /// segment (optionally restricted to those attached to [ptIdx] when given)
-  /// so that moving the rig points keeps the assets anchored in place (the
-  /// offset compensates the point movement).
   void _captureAnchorForPoint(Figure fig, int ptIdx, {bool all = false}) {
     if (!widget.controller.isAnchorMode) return;
     _drag.anchorImgCenter.clear();
@@ -541,20 +408,18 @@ final z = widget.controller.camera.zoom;
           s.point2Index != ptIdx) {
         continue;
       }
-      if (s.point1Index >= fig.points.length ||
-          s.point2Index >= fig.points.length) {
-        continue;
-      }
       final p1 = fig.points[s.point1Index];
       final p2 = fig.points[s.point2Index];
-      final midX = (p1.x + p2.x) / 2 + s.imageOffsetX;
-      final midY = (p1.y + p2.y) / 2 + s.imageOffsetY;
+      final midX = (p1.x + p2.x) / 2;
+      final midY = (p1.y + p2.y) / 2;
       final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-      _drag.anchorImgCenter[s.id] = Point2(midX, midY);
+      _drag.anchorImgCenter[s.id] = Point2(
+        midX + s.imageOffsetX,
+        midY + s.imageOffsetY,
+      );
       _drag.anchorImgRot[s.id] = segAngle * 180 / math.pi + s.imageRotate;
     }
   }
-
 
   Segment? _segmentTouching(Figure fig, int ptIdx) {
     for (final s in fig.segments) {
@@ -579,22 +444,7 @@ final z = widget.controller.camera.zoom;
     final w = _screenToWorld(loc, _canvasSize, cam);
 
     if (d.assetDrag) {
-      final seg = fig.getSegment(widget.controller.assetSegmentId ?? '');
-      if (seg != null && seg.isImage) {
-        if (d.assetOp == 'move') {
-          seg.imageOffsetX = d.startOx + (w.dx - d.startX);
-          seg.imageOffsetY = d.startOy + (w.dy - d.startY);
-          widget.controller.forceUpdate();
-        } else if (d.assetOp == 'rotate') {
-          final cur = math.atan2(w.dy - d.assetCenterY, w.dx - d.assetCenterX);
-          var delta = cur - d.startAngle;
-          seg.imageRotate = d.startRot + delta * 180 / math.pi;
-          widget.controller.forceUpdate();
-        } else if (d.assetOp == 'resize') {
-          _handleAssetResize(w, seg, d);
-          widget.controller.forceUpdate();
-        }
-      }
+      handleAssetMove(w, fig, d);
       return;
     }
 
@@ -790,31 +640,7 @@ final z = widget.controller.camera.zoom;
     }
   }
 
-  void _handleAssetResize(Offset w, Segment seg, _DragState d) {
-    // Handle layout: 0=TR,1=TC,2=TL,3=LC,4=BL,5=BC,6=BR,7=RC
-    // The image is drawn centered at midpoint+offset, so resizing only needs
-    // to change imageWidth/imageHeight; the box grows/shrinks around center.
-    final p1 = widget.controller.figure.points[seg.point1Index];
-    final p2 = widget.controller.figure.points[seg.point2Index];
-    final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-    final rotate = segAngle + seg.imageRotate * math.pi / 180;
-    final cosR = math.cos(-rotate), sinR = math.sin(-rotate);
-    final dx = w.dx - d.assetCenterX, dy = w.dy - d.assetCenterY;
-    final lx = dx * cosR - dy * sinR;
-    final ly = dx * sinR + dy * cosR;
 
-    var newW = d.startW;
-    var newH = d.startH;
-    final h = d.assetHandle;
-    if (h == 0 || h == 2 || h == 4 || h == 6) {
-      newW = (lx.abs() * 2).clamp(10.0, double.infinity);
-    }
-    if (h == 1 || h == 3 || h == 5 || h == 7) {
-      newH = (ly.abs() * 2).clamp(10.0, double.infinity);
-    }
-    seg.imageWidth = newW;
-    seg.imageHeight = newH;
-  }
 
   /// Join/unjoin drag handling for the [EditorTool.join] tool.
   ///
