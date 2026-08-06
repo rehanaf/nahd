@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_theme.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// A circular toolbar button (used in the top capsule and sidebars).
 class EditorIconButton extends StatelessWidget {

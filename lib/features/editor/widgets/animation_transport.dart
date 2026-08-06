@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../state/editor_controller.dart';
-import '../../theme/app_theme.dart';
+import '../controllers/editor_controller.dart';
+import '../../../core/theme/app_theme.dart';
 import 'editor_buttons.dart';
 
 /// Transport bar: prev/next frame, frame counter, play/pause.

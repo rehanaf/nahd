@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/project_storage.dart';
+import '../../../core/project_storage.dart';
 
 /// App-level state: theme mode + profile name.
 class AppController extends ChangeNotifier {

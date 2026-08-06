@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/project_storage.dart';
-import 'screens/editor_screen.dart';
-import 'screens/main_menu_screen.dart';
-import 'state/app_controller.dart';
-import 'state/editor_controller.dart';
-import 'theme/app_theme.dart';
+import 'core/theme/app_theme.dart';
+import 'features/editor/controllers/editor_controller.dart';
+import 'features/editor/screens/editor_screen.dart';
+import 'features/project_management/controllers/app_controller.dart';
+import 'features/project_management/screens/main_menu_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

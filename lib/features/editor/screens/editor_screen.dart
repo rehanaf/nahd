@@ -1,19 +1,19 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
-import '../core/models/figure.dart';
-import '../core/models/segment.dart';
-import '../core/project_storage.dart';
-import '../core/svg_import.dart';
-import '../state/editor_controller.dart';
-import '../theme/app_theme.dart';
-import '../widgets/editor/animation_settings_panel.dart';
-import '../widgets/editor/animation_transport.dart';
-import '../widgets/editor/editor_buttons.dart';
-import '../widgets/editor/figure_canvas.dart';
-import '../widgets/editor/layer_panel.dart';
-import '../widgets/editor/segment_inspector.dart';
-import 'frames_screen.dart';
+import '../../../core/models/figure.dart';
+import '../../../core/models/segment.dart';
+import '../../../core/project_storage.dart';
+import '../../../core/svg_import.dart';
+import '../controllers/editor_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import '../widgets/animation_settings_panel.dart';
+import '../widgets/animation_transport.dart';
+import '../widgets/editor_buttons.dart';
+import '../widgets/figure_canvas.dart';
+import '../widgets/layer_panel.dart';
+import '../widgets/segment_inspector.dart';
+import '../widgets/frames_screen.dart';
 
 part 'editor_screen_sheets.dart';
 

@@ -1,12 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../core/project_io.dart';
-import '../core/project_storage.dart';
-import '../core/scene/predefined_projects.dart';
-import '../core/models/figure.dart';
-import '../state/app_controller.dart';
-import '../theme/app_theme.dart';
-import '../widgets/figure_preview.dart';
+import '../../../core/project_io.dart';
+import '../../../core/project_storage.dart';
+import '../../../core/scene/predefined_projects.dart';
+import '../../../core/models/figure.dart';
+import '../controllers/app_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../editor/widgets/figure_preview.dart';
 
 part 'main_menu_tiles.dart';
 part 'main_menu_sheets.dart';

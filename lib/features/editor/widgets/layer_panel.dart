@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../core/models/figure.dart';
-import '../../core/models/segment.dart';
-import '../../state/editor_controller.dart';
-import '../../theme/app_theme.dart';
+import '../../../core/models/figure.dart';
+import '../../../core/models/segment.dart';
+import '../controllers/editor_controller.dart';
+import '../../../core/theme/app_theme.dart';
 
 class LayerPanel extends StatefulWidget {
   final EditorController controller;

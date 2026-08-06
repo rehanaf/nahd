@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart'
     hide colorToHex;
 
-import '../core/models/segment.dart';
+import '../models/segment.dart';
 import '../theme/app_theme.dart';
 
 /// Quick-select palette used across the editor.

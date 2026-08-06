@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../core/models/segment.dart';
-import '../../state/editor_controller.dart';
-import '../../theme/app_theme.dart';
-import '../color_picker_sheet.dart';
+import '../../../core/models/segment.dart';
+import '../controllers/editor_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/color_picker_sheet.dart';
 
 /// Settings drawer: FPS, canvas size, onion skin, auto easing.
 class AnimationSettingsPanel extends StatefulWidget {

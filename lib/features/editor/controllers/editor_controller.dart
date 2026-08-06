@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../core/models/figure.dart';
-import '../core/models/figure_animation.dart';
-import '../core/models/segment.dart';
-import '../core/project_storage.dart';
+import '../../../core/models/figure.dart';
+import '../../../core/models/figure_animation.dart';
+import '../../../core/models/segment.dart';
+import '../../../core/project_storage.dart';
 
 enum EditorMode { figure, animate }
 

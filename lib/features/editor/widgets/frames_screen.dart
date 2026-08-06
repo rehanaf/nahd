@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../core/models/figure.dart';
-import '../state/editor_controller.dart';
-import '../theme/app_theme.dart';
-import '../widgets/figure_preview.dart';
+import '../../../core/models/figure.dart';
+import '../controllers/editor_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import 'figure_preview.dart';
 
 /// A separate page showing every frame of the animation as a grid of
 /// thumbnails. Tap a frame to jump to it; long-press / right-click opens

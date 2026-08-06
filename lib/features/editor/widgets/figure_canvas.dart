@@ -1,14 +1,14 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../core/models/figure.dart';
-import '../../core/models/figure_animation.dart';
-import '../../core/models/segment.dart';
-import '../../state/editor_controller.dart';
-import '../../theme/app_theme.dart';
+import '../../../core/models/figure.dart';
+import '../../../core/models/figure_animation.dart';
+import '../../../core/models/segment.dart';
+import '../controllers/editor_controller.dart';
+import '../../../core/theme/app_theme.dart';
 
 part 'figure_canvas_types.dart';
 part 'figure_canvas_painter.dart';

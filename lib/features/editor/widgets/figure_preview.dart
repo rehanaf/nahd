@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../core/models/figure.dart';
+import '../../../core/models/figure.dart';
 
 Color? _parseHex(String? hex) {
   if (hex == null || hex.isEmpty) return null;
