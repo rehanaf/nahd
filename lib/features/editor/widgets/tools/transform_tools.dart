@@ -140,75 +140,48 @@ extension _TransformTools on _FigureCanvasState {
     for (final i in comp) {
       adj[i] = [];
     }
-    var edgeCount = 0;
     for (final s in fig.segments) {
       if (!comp.contains(s.point1Index) || !comp.contains(s.point2Index)) {
         continue;
       }
       adj[s.point1Index]!.add(s.point2Index);
       adj[s.point2Index]!.add(s.point1Index);
-      edgeCount++;
     }
 
-    // A node is in a cycle if it has 2 or more connections within the connected component
-    final cycleNodes = comp.where((i) => adj[i]!.length >= 2).toSet();
-    final isCycle = edgeCount >= comp.length && cycleNodes.contains(ptHit);
-
-    int centre;
-    List<int> rotPts;
-    if (isCycle) {
-      final depth = <int, int>{subRoot: 0};
-      final queue = <int>[subRoot];
-      while (queue.isNotEmpty) {
-        final cur = queue.removeAt(0);
-        for (final other in adj[cur]!) {
-          if (depth.containsKey(other)) continue;
-          depth[other] = depth[cur]! + 1;
-          queue.add(other);
-        }
+    // 2. Build Spanning Tree (BFS) from subRoot to establish parent-child relationships.
+    // This handles any complex cycles by treating back-edges as secondary.
+    final parent = <int, int>{};
+    final visited = <int>{subRoot};
+    final queue = <int>[subRoot];
+    while (queue.isNotEmpty) {
+      final cur = queue.removeAt(0);
+      for (final other in adj[cur]!) {
+        if (visited.contains(other)) continue;
+        visited.add(other);
+        parent[other] = cur;
+        queue.add(other);
       }
-      // Find the pivot node of the cycle (the node in the cycle closest to the root)
-      int pivotNode = ptHit;
-      var bestDepth = 99999;
-      for (final i in cycleNodes) {
-        final d = depth[i];
-        if (d != null && d < bestDepth) {
-          bestDepth = d;
-          pivotNode = i;
-        }
-      }
-      centre = ptHit == pivotNode
-          ? (seg != null
-              ? (seg.point1Index == ptHit ? seg.point2Index : seg.point1Index)
-              : (adj[ptHit]!.isNotEmpty ? adj[ptHit]!.first : ptHit))
-          : pivotNode;
-      rotPts = comp.where((i) => i != subRoot).toList();
-    } else {
-      final parent = <int, int>{};
-      final visited = <int>{subRoot};
-      final queue = <int>[subRoot];
-      while (queue.isNotEmpty) {
-        final cur = queue.removeAt(0);
-        for (final other in adj[cur]!) {
-          if (visited.contains(other)) continue;
-          visited.add(other);
-          parent[other] = cur;
-          queue.add(other);
-        }
-      }
-      centre = parent[ptHit] ?? (seg?.point1Index == ptHit ? seg!.point2Index : seg!.point1Index);
-      final rot = <int>[];
-      final stk = <int>[ptHit];
-      while (stk.isNotEmpty) {
-        final cur = stk.removeLast();
-        if (rot.contains(cur)) continue;
-        rot.add(cur);
-        for (final other in adj[cur]!) {
-          if (parent[other] == cur) stk.add(other);
-        }
-      }
-      rotPts = rot;
     }
+
+    // 3. Center of rotation is the parent in our Spanning Tree.
+    // Fallback to neighbour if parent not found.
+    final centre = parent[ptHit] ?? (seg?.point1Index == ptHit ? seg!.point2Index : seg!.point1Index);
+
+    // 4. Find all descendants (subtree points) of ptHit in the Spanning Tree.
+    // Only these points will rotate, keeping parent structures stable.
+    final rotPts = <int>[];
+    final stk = <int>[ptHit];
+    while (stk.isNotEmpty) {
+      final cur = stk.removeLast();
+      if (rotPts.contains(cur)) continue;
+      rotPts.add(cur);
+      for (final other in adj[cur]!) {
+        if (parent[other] == cur) {
+          stk.add(other);
+        }
+      }
+    }
+
     if (rotPts.isEmpty || centre < 0 || centre >= fig.points.length) {
       widget.controller.forceUpdate();
       return false;

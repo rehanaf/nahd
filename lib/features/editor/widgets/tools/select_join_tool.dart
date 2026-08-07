@@ -24,7 +24,7 @@ extension _SelectJoinTool on _FigureCanvasState {
 
     final rootHit = _hitTestPoint(w);
     final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
-    if (tool == EditorTool.select && roots.contains(rootHit)) {
+    if (roots.contains(rootHit)) {
       final allC = _findConnectedPoints(fig, rootHit)..add(rootHit);
       final init = <int, Point2>{};
       for (final i in allC) {
