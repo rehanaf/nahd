@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/figure.dart';
@@ -753,6 +754,18 @@ class _FigureCanvasState extends State<FigureCanvas> {
           onPointerMove: _handlePointerMove,
           onPointerUp: _handlePointerUp,
           onPointerCancel: _handlePointerUp,
+          onPointerSignal: (pointerSignal) {
+            if (pointerSignal is PointerScrollEvent) {
+              final cam = widget.controller.camera;
+              final zoomDelta = -pointerSignal.scrollDelta.dy * 0.001;
+              final newZoom = (cam.zoom + zoomDelta).clamp(0.1, 5.0);
+              widget.controller.setCamera(CameraTransform(
+                x: cam.x,
+                y: cam.y,
+                zoom: newZoom,
+              ));
+            }
+          },
           child: LayoutBuilder(
             builder: (context, constraints) {
               _canvasSize = constraints.biggest;

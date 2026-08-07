@@ -22,30 +22,32 @@ extension _SelectJoinTool on _FigureCanvasState {
       }
     }
 
-    final rootHit = _hitTestPoint(w);
-    final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
-    if (roots.contains(rootHit)) {
-      final allC = _findConnectedPoints(fig, rootHit)..add(rootHit);
-      final init = <int, Point2>{};
-      for (final i in allC) {
-        init[i] = fig.points[i].clone();
+    if (tool != EditorTool.line && tool != EditorTool.circle) {
+      final rootHit = _hitTestPoint(w);
+      final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
+      if (roots.contains(rootHit)) {
+        final allC = _findConnectedPoints(fig, rootHit)..add(rootHit);
+        final init = <int, Point2>{};
+        for (final i in allC) {
+          init[i] = fig.points[i].clone();
+        }
+        widget.controller.setSelectedPoint(rootHit);
+        final cs = _segmentTouching(fig, rootHit);
+        widget.controller.setSelectedSegment(cs?.id);
+        _drag
+          ..reset()
+          ..active = true
+          ..isPoint = true
+          ..ptIdx = rootHit
+          ..startX = w.dx
+          ..startY = w.dy
+          ..startPtX = fig.points[rootHit].x
+          ..startPtY = fig.points[rootHit].y
+          ..connPts = allC
+          ..fkInit = init;
+        widget.controller.forceUpdate();
+        return;
       }
-      widget.controller.setSelectedPoint(rootHit);
-      final cs = _segmentTouching(fig, rootHit);
-      widget.controller.setSelectedSegment(cs?.id);
-      _drag
-        ..reset()
-        ..active = true
-        ..isPoint = true
-        ..ptIdx = rootHit
-        ..startX = w.dx
-        ..startY = w.dy
-        ..startPtX = fig.points[rootHit].x
-        ..startPtY = fig.points[rootHit].y
-        ..connPts = allC
-        ..fkInit = init;
-      widget.controller.forceUpdate();
-      return;
     }
 
     if (tool == EditorTool.select) {
