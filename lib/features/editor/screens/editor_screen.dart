@@ -304,18 +304,17 @@ class _EditorScreenState extends State<EditorScreen> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.black26,
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    "ADD ASSET / SEGMENT",
+                    "Add Asset / Segment",
                     style: TextStyle(
-                      color: palette.textSecondary,
-                      fontSize: 10,
+                      color: palette.text,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
                     ),
                   ),
                 ),
@@ -365,16 +364,6 @@ class _EditorScreenState extends State<EditorScreen> {
                   palette: palette,
                 ),
                 _drawerSegmentIcon(
-                  icon: Icons.join_inner,
-                  label: 'Join',
-                  color: const Color(0xFFF97316),
-                  onTap: () {
-                    c.addSegment('join');
-                    Navigator.of(context).pop();
-                  },
-                  palette: palette,
-                ),
-                _drawerSegmentIcon(
                   icon: Icons.image,
                   label: 'Image',
                   color: const Color(0xFFEC4899),
@@ -397,14 +386,19 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
           ),
           Expanded(
-            child: FutureBuilder<List<ProjectMeta>>(
-              future: ProjectStorage.listProjects(ProjectType.figure),
+            child: FutureBuilder<List<dynamic>>(
+              future: Future.wait([
+                ProjectStorage.listGroups(ProjectType.figure),
+                ProjectStorage.listProjects(ProjectType.figure),
+              ]),
               builder: (ctx, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final list = snapshot.data ?? [];
-                final filtered = list.where((p) => p.id != c.projectId).toList();
+                final data = snapshot.data ?? [[], []];
+                final groups = List<ProjectGroup>.from(data[0] as List);
+                final projects = List<ProjectMeta>.from(data[1] as List);
+                final filtered = projects.where((p) => p.id != c.projectId).toList();
                 if (filtered.isEmpty) {
                   return Center(
                     child: Padding(
@@ -416,41 +410,89 @@ class _EditorScreenState extends State<EditorScreen> {
                     ),
                   );
                 }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, idx) {
-                    final meta = filtered[idx];
-                    return Card(
-                      color: palette.background,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: palette.border, width: 0.5),
-                      ),
-                      child: ListTile(
-                        dense: true,
+
+                final grouped = <String?, List<ProjectMeta>>{};
+                for (final p in filtered) {
+                  grouped.putIfAbsent(p.groupId, () => []).add(p);
+                }
+
+                final displayGroups = <Widget>[];
+
+                for (final group in groups) {
+                  final groupProjects = grouped[group.id] ?? [];
+                  if (groupProjects.isEmpty) continue;
+                  displayGroups.add(
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
                         title: Text(
-                          meta.name,
-                          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold),
+                          group.name,
+                          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
-                        subtitle: Text(
-                          "ID: ${meta.id.substring(0, math.min(8, meta.id.length))}...",
-                          style: TextStyle(color: palette.textSecondary),
-                        ),
-                        trailing: Icon(Icons.add, color: palette.text, size: 16),
-                        onTap: () {
-                          _handleAddFigure(meta);
-                          Navigator.of(context).pop();
-                        },
+                        leading: Icon(Icons.folder, color: palette.textSecondary, size: 18),
+                        childrenPadding: const EdgeInsets.only(left: 16),
+                        initiallyExpanded: true,
+                        children: groupProjects.map((p) => _buildFigureListTile(p, palette)).toList(),
                       ),
-                    );
-                  },
+                    ),
+                  );
+                }
+
+                final activeGroupIds = groups.map((g) => g.id).toSet();
+                final ungroupedProjects = filtered.where((p) => p.groupId == null || !activeGroupIds.contains(p.groupId)).toList();
+                if (ungroupedProjects.isNotEmpty) {
+                  displayGroups.add(
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        title: Text(
+                          "Default / Ungrouped",
+                          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        leading: Icon(Icons.folder_open, color: palette.textSecondary, size: 18),
+                        childrenPadding: const EdgeInsets.only(left: 16),
+                        initiallyExpanded: true,
+                        children: ungroupedProjects.map((p) => _buildFigureListTile(p, palette)).toList(),
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: displayGroups,
                 );
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFigureListTile(ProjectMeta meta, AppPalette palette) {
+    return Card(
+      color: palette.background,
+      margin: const EdgeInsets.only(bottom: 8, right: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: palette.border, width: 0.5),
+      ),
+      child: ListTile(
+        dense: true,
+        title: Text(
+          meta.name,
+          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          "ID: ${meta.id.substring(0, math.min(8, meta.id.length))}...",
+          style: TextStyle(color: palette.textSecondary, fontSize: 11),
+        ),
+        trailing: Icon(Icons.add, color: palette.text, size: 16),
+        onTap: () {
+          _handleAddFigure(meta);
+          Navigator.of(context).pop();
+        },
       ),
     );
   }
@@ -498,18 +540,21 @@ class _EditorScreenState extends State<EditorScreen> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.black26,
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    tab.name.toUpperCase(),
+                    tab == _RightTab.inspector
+                        ? "Properties"
+                        : tab == _RightTab.settings
+                            ? "Animation Settings"
+                            : "Layers",
                     style: TextStyle(
-                      color: palette.textSecondary,
-                      fontSize: 10,
+                      color: palette.text,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
                     ),
                   ),
                 ),
