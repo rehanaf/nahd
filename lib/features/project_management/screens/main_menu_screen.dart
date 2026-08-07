@@ -348,7 +348,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void _fabPress() {
     _newTargetGroup = _activeGroup?.id;
     _showNameModal(
-      title: _tab == ProjectType.animation ? 'New Animation' : 'New Animation Preset',
+      title: _tab == ProjectType.animation
+          ? 'New Animation'
+          : _tab == ProjectType.preset
+              ? 'New Animation Preset'
+              : 'New Figure',
       placeholder: 'Project Name',
       buttonLabel: 'Create',
       onSubmit: _tab == ProjectType.animation ? _handleAnimationComingSoon : _handleCreate,
@@ -477,9 +481,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _tabButton(palette, ProjectType.figure, Icons.person_pin, 'Preset'),
-          const SizedBox(width: 8),
           _tabButton(palette, ProjectType.animation, Icons.movie, 'Animation'),
+          const SizedBox(width: 8),
+          _tabButton(palette, ProjectType.preset, Icons.person_pin, 'Preset'),
+          const SizedBox(width: 8),
+          _tabButton(palette, ProjectType.figure, Icons.category, 'Figure'),
           const Spacer(),
           _sortButton(palette),
           const SizedBox(width: 8),

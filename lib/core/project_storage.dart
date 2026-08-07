@@ -10,7 +10,7 @@ const _themeKey = 'id_animate_theme';
 
 String _dataKey(String id) => 'id_animate_project_$id';
 
-enum ProjectType { figure, animation }
+enum ProjectType { figure, preset, animation }
 
 class ProjectMeta {
   String id;
@@ -46,7 +46,9 @@ class ProjectMeta {
         name: json['name'] as String? ?? '',
         type: json['type'] == 'figure'
             ? ProjectType.figure
-            : ProjectType.animation,
+            : json['type'] == 'preset'
+                ? ProjectType.preset
+                : ProjectType.animation,
         createdAt: (json['createdAt'] as num?)?.toInt() ?? 0,
         updatedAt: (json['updatedAt'] as num?)?.toInt() ?? 0,
         groupId: json['groupId'] as String?,
@@ -190,7 +192,9 @@ class ProjectStorage {
       name: name.trim().isEmpty
           ? (type == ProjectType.animation
               ? 'Untitled Animation'
-              : 'Untitled Figure')
+              : type == ProjectType.preset
+                  ? 'Untitled Preset'
+                  : 'Untitled Figure')
           : name.trim(),
       type: type,
       createdAt: now,
