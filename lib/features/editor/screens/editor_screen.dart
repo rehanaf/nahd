@@ -428,72 +428,79 @@ class _EditorScreenState extends State<EditorScreen> {
                   ],
                 ),
 
-                // Center: Tool mode capsule.
-                OverlayCapsule(
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Pivot (default active).
-                      EditorIconButton(
-                        icon: Icons.rotate_right,
-                        color: const Color(0xFFF97316),
-                        active: c.activeTool == EditorTool.rotate,
-                        onTap: () => c.setTool(EditorTool.rotate),
-                      ),
-                      // Modify group (Point, Modify, Curve).
-                      ToolGroupButton(
-                        subTools: const [
-                          ToolGroupSub(
-                              icon: Icons.open_with,
-                              key: 'point',
-                              color: Color(0xFF3B82F6)),
-                          ToolGroupSub(
-                              icon: Icons.center_focus_strong,
-                              key: 'modify',
-                              color: Color(0xFF06B6D4)),
-                          ToolGroupSub(
-                              icon: Icons.timeline,
-                              key: 'curve',
-                              color: Color(0xFFEC4899)),
+                // Center: Tool mode capsule + Scene mode capsule.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OverlayCapsule(
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Pivot (default active).
+                          EditorIconButton(
+                            icon: Icons.rotate_right,
+                            color: const Color(0xFFF97316),
+                            active: c.activeTool == EditorTool.rotate,
+                            onTap: () => c.setTool(EditorTool.rotate),
+                          ),
+                          // Modify group (Point, Modify, Curve).
+                          ToolGroupButton(
+                            subTools: const [
+                              ToolGroupSub(
+                                  icon: Icons.open_with,
+                                  key: 'point',
+                                  color: Color(0xFF3B82F6)),
+                              ToolGroupSub(
+                                  icon: Icons.center_focus_strong,
+                                  key: 'modify',
+                                  color: Color(0xFF06B6D4)),
+                              ToolGroupSub(
+                                  icon: Icons.timeline,
+                                  key: 'curve',
+                                  color: Color(0xFFEC4899)),
+                            ],
+                            selectedKey: _modifyKey(c.activeTool),
+                            onSelect: (k) {
+                              setState(() => _lastModifyKey = k);
+                              c.setTool(_modifyTool(k));
+                            },
+                            active: _isModifyTool(c.activeTool),
+                            onActivate: () => c.setTool(_modifyTool(_lastModifyKey)),
+                            placement: ToolGroupPlacement.bottom,
+                          ),
+                          // Transform group (Move All, Rotate All, Scale All).
+                          ToolGroupButton(
+                            subTools: const [
+                              ToolGroupSub(
+                                  icon: Icons.near_me,
+                                  key: 'moveAll',
+                                  color: Color(0xFF22C55E)),
+                              ToolGroupSub(
+                                  icon: Icons.rotate_left,
+                                  key: 'rotateAll',
+                                  color: Color(0xFFEAB308)),
+                              ToolGroupSub(
+                                  icon: Icons.compress,
+                                  key: 'scaleAll',
+                                  color: Color(0xFFF97316)),
+                            ],
+                            selectedKey: _transformKey(c.activeTool),
+                            onSelect: (k) {
+                              setState(() => _lastTransformKey = k);
+                              c.setTool(_transformTool(k));
+                            },
+                            active: _isTransformTool(c.activeTool),
+                            onActivate: () => c.setTool(_transformTool(_lastTransformKey)),
+                            placement: ToolGroupPlacement.bottom,
+                          ),
                         ],
-                        selectedKey: _modifyKey(c.activeTool),
-                        onSelect: (k) {
-                          setState(() => _lastModifyKey = k);
-                          c.setTool(_modifyTool(k));
-                        },
-                        active: _isModifyTool(c.activeTool),
-                        onActivate: () => c.setTool(_modifyTool(_lastModifyKey)),
-                        placement: ToolGroupPlacement.bottom,
                       ),
-                      // Transform group (Move All, Rotate All, Scale All).
-                      ToolGroupButton(
-                        subTools: const [
-                          ToolGroupSub(
-                              icon: Icons.near_me,
-                              key: 'moveAll',
-                              color: Color(0xFF22C55E)),
-                          ToolGroupSub(
-                              icon: Icons.rotate_left,
-                              key: 'rotateAll',
-                              color: Color(0xFFEAB308)),
-                          ToolGroupSub(
-                              icon: Icons.compress,
-                              key: 'scaleAll',
-                              color: Color(0xFFF97316)),
-                        ],
-                        selectedKey: _transformKey(c.activeTool),
-                        onSelect: (k) {
-                          setState(() => _lastTransformKey = k);
-                          c.setTool(_transformTool(k));
-                        },
-                        active: _isTransformTool(c.activeTool),
-                        onActivate: () => c.setTool(_transformTool(_lastTransformKey)),
-                        placement: ToolGroupPlacement.bottom,
-                      ),
-                      // Scene mode group (independent from the active tool):
-                      // one of rig / asset / anchor is always active.
-                      ToolGroupButton(
+                    ),
+                    const SizedBox(width: 4),
+                    OverlayCapsule(
+                      padding: const EdgeInsets.all(4),
+                      child: ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
                               icon: Icons.accessibility_new,
@@ -514,8 +521,8 @@ class _EditorScreenState extends State<EditorScreen> {
                         onActivate: () {},
                         placement: ToolGroupPlacement.bottom,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
 
                 // Right: Animation transport capsule (prev/next) + More (zoom) menu.
