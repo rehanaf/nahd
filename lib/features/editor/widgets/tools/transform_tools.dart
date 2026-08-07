@@ -120,6 +120,13 @@ extension _TransformTools on _FigureCanvasState {
       widget.controller.setSelectedSegment(null);
       return false;
     }
+
+    final subRoot = _rootOfPoint(fig, ptHit);
+    // 1. Root points should NEVER rotate. Returning false lets the canvas fallback to dragging/moving the whole sub-figure.
+    if (ptHit == subRoot) {
+      return false;
+    }
+
     widget.controller.setSelectedPoint(ptHit);
     final seg = _segmentTouching(fig, ptHit);
     widget.controller.setSelectedSegment(seg?.id);
@@ -143,8 +150,9 @@ extension _TransformTools on _FigureCanvasState {
       edgeCount++;
     }
 
-    final isCycle = edgeCount >= comp.length;
-    final subRoot = _rootOfPoint(fig, ptHit);
+    // A node is in a cycle if it has 2 or more connections within the connected component
+    final cycleNodes = comp.where((i) => adj[i]!.length >= 2).toSet();
+    final isCycle = edgeCount >= comp.length && cycleNodes.contains(ptHit) && !cycleNodes.contains(subRoot);
 
     int centre;
     List<int> rotPts;
@@ -159,12 +167,12 @@ extension _TransformTools on _FigureCanvasState {
           queue.add(other);
         }
       }
+      // Find the pivot node of the cycle (the node in the cycle closest to the root)
       int pivotNode = ptHit;
-      var bestDepth = depth[ptHit] ?? 99999;
-      for (final i in comp) {
+      var bestDepth = 99999;
+      for (final i in cycleNodes) {
         final d = depth[i];
-        if (d == null || i == subRoot) continue;
-        if (d < bestDepth) {
+        if (d != null && d < bestDepth) {
           bestDepth = d;
           pivotNode = i;
         }
