@@ -183,8 +183,8 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
                   ? Alignment.topCenter
                   : Alignment.topLeft,
               offset: widget.placement == ToolGroupPlacement.bottom
-                  ? const Offset(0, 6)
-                  : const Offset(6, 0),
+                  ? const Offset(0, 4)
+                  : const Offset(4, 0),
               child: Material(
                 type: MaterialType.transparency,
                 child: GestureDetector(
