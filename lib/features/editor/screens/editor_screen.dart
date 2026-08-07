@@ -628,21 +628,10 @@ class _EditorScreenState extends State<EditorScreen> {
                     const SizedBox(width: 4),
                     OverlayCapsule(
                       padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          EditorIconButton(
-                            icon: Icons.create_new_folder,
-                            color: const Color(0xFF22C55E),
-                            onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                          ),
-                          const SizedBox(width: 4),
-                          EditorIconButton(
-                            icon: Icons.join_inner,
-                            color: const Color(0xFFF97316),
-                            active: c.activeTool == EditorTool.join,
-                            onTap: () => c.setTool(EditorTool.join),
-                          ),
-                        ],
+                      child: EditorIconButton(
+                        icon: Icons.create_new_folder,
+                        color: const Color(0xFF22C55E),
+                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       ),
                     ),
                   ],
@@ -895,6 +884,18 @@ class _EditorScreenState extends State<EditorScreen> {
                                 color: Colors.grey,
                                 active: activeTool == EditorTool.none,
                                 onTap: () { c.setTool(EditorTool.none); setState(() {}); },
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(height: 1, width: 24, color: Theme.of(context).appColors.border),
+                            const SizedBox(height: 8),
+                            Tooltip(
+                              message: 'Join Tool',
+                              child: EditorIconButton(
+                                icon: Icons.join_inner,
+                                color: const Color(0xFFF97316),
+                                active: activeTool == EditorTool.join,
+                                onTap: () { c.setTool(EditorTool.join); setState(() {}); },
                               ),
                             ),
                           ],

@@ -147,6 +147,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     if (mounted) widget.onOpenProject(meta.id, meta.type);
   }
 
+  Future<void> _handleAnimationComingSoon(String _) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Animation Scene Editor — Coming Soon! 🎬',
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: Color(0xFF7C3AED),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _handleDelete(String id) async {
     await ProjectStorage.deleteProject(id);
     _refresh();
@@ -336,10 +348,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void _fabPress() {
     _newTargetGroup = _activeGroup?.id;
     _showNameModal(
-      title: _tab == ProjectType.animation ? 'New Animation' : 'New Figure',
+      title: _tab == ProjectType.animation ? 'New Animation' : 'New Animation Preset',
       placeholder: 'Project Name',
       buttonLabel: 'Create',
-      onSubmit: _handleCreate,
+      onSubmit: _tab == ProjectType.animation ? _handleAnimationComingSoon : _handleCreate,
     );
   }
 
@@ -465,9 +477,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _tabButton(palette, ProjectType.animation, Icons.play_arrow, 'Animation'),
+          _tabButton(palette, ProjectType.figure, Icons.person_pin, 'Preset'),
           const SizedBox(width: 8),
-          _tabButton(palette, ProjectType.figure, Icons.category, 'Figure'),
+          _tabButton(palette, ProjectType.animation, Icons.movie, 'Animation'),
           const Spacer(),
           _sortButton(palette),
           const SizedBox(width: 8),
