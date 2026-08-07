@@ -185,12 +185,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _openAddFigure() async {
     final list = await ProjectStorage.listProjects(ProjectType.figure);
+    final filtered = list.where((p) => p.id != widget.controller.projectId).toList();
     if (!mounted) return;
     final meta = await showModalBottomSheet<ProjectMeta>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (sheetContext) => _AddFigureSheet(projects: list),
+      builder: (sheetContext) => _AddFigureSheet(projects: filtered),
     );
     if (meta != null) _handleAddFigure(meta);
   }
@@ -547,14 +548,12 @@ class _EditorScreenState extends State<EditorScreen> {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (c.isAnimateMode) ...[
-                        EditorIconButton(
-                          icon: Icons.create_new_folder,
-                          color: const Color(0xFF22C55E),
-                          onTap: _openAddFigure,
-                        ),
-                        const SizedBox(height: 4),
-                      ],
+                      EditorIconButton(
+                        icon: Icons.create_new_folder,
+                        color: const Color(0xFF22C55E),
+                        onTap: _openAddFigure,
+                      ),
+                      const SizedBox(height: 4),
                       ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
