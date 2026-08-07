@@ -760,16 +760,104 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
           ),
 
-          // Left sidebar — 5-tab system: Capsule 1 = tabs, Capsule 2 = content.
+          // Left sidebar — 5-tab system (Figure) or 1-capsule system (Animate/Preset)
           Positioned(
             top: 50 + pad.top,
             left: 4 + pad.left,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Capsule 1: Tab icons (always 5 tabs visible)
-                OverlayCapsule(
+            child: c.isAnimateMode
+                ? OverlayCapsule(
+                    padding: const EdgeInsets.all(4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Tooltip(
+                          message: 'Permanent Delete',
+                          child: EditorIconButton(
+                            icon: Icons.delete_forever,
+                            color: const Color(0xFFEF4444),
+                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
+                            onTap: () {
+                              final ptIdx = c.selectedPointIndex ??
+                                  (c.selectedSegmentId != null
+                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
+                                      : null);
+                              if (ptIdx != null) {
+                                final comp = c.figure.connectedComponent(ptIdx);
+                                final root = c.figure.rootIndices.firstWhere(
+                                  (r) => comp.contains(r),
+                                  orElse: () => -1,
+                                );
+                                if (root != -1) {
+                                  c.removeFigureAt(root);
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Tooltip(
+                          message: 'Toggle Visibility (Coming Soon)',
+                          child: EditorIconButton(
+                            icon: Icons.visibility,
+                            color: const Color(0xFF3B82F6),
+                            onTap: () {},
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Tooltip(
+                          message: 'Opacity (Coming Soon)',
+                          child: EditorIconButton(
+                            icon: Icons.opacity,
+                            color: const Color(0xFF10B981),
+                            onTap: () {},
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(height: 1, width: 24, color: palette.border),
+                        const SizedBox(height: 8),
+                        Tooltip(
+                          message: 'Copy Pose',
+                          child: EditorIconButton(
+                            icon: Icons.copy,
+                            color: const Color(0xFFF59E0B),
+                            onTap: () {
+                              c.copyFrame(c.currentTime);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Pose copied', style: TextStyle(color: Colors.white)),
+                                    backgroundColor: Color(0xFF22C55E),
+                                    duration: Duration(seconds: 1)),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Tooltip(
+                          message: 'Paste Pose',
+                          child: EditorIconButton(
+                            icon: Icons.paste,
+                            color: const Color(0xFFF59E0B),
+                            disabled: !c.hasCopiedFrame,
+                            onTap: () {
+                              c.pasteFrame(c.currentTime);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Pose pasted', style: TextStyle(color: Colors.white)),
+                                    backgroundColor: Color(0xFF22C55E),
+                                    duration: Duration(seconds: 1)),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Capsule 1: Tab icons (always 5 tabs visible)
+                      OverlayCapsule(
                   padding: const EdgeInsets.all(4),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
