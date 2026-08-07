@@ -654,6 +654,26 @@ class _EditorScreenState extends State<EditorScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    OverlayCapsule(
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          EditorIconButton(
+                            icon: Icons.create_new_folder,
+                            color: const Color(0xFF22C55E),
+                            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                          ),
+                          const SizedBox(width: 4),
+                          EditorIconButton(
+                            icon: Icons.join_inner,
+                            color: const Color(0xFFF97316),
+                            active: c.activeTool == EditorTool.join,
+                            onTap: () => c.setTool(EditorTool.join),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
 
@@ -790,12 +810,6 @@ class _EditorScreenState extends State<EditorScreen> {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      EditorIconButton(
-                        icon: Icons.create_new_folder,
-                        color: const Color(0xFF22C55E),
-                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                      ),
-                      const SizedBox(height: 4),
                       ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
@@ -806,10 +820,6 @@ class _EditorScreenState extends State<EditorScreen> {
                               icon: Icons.panorama_fish_eye,
                               key: 'circle',
                               color: Color(0xFF22C55E)),
-                          ToolGroupSub(
-                              icon: Icons.join_inner,
-                              key: 'join',
-                              color: Color(0xFFF97316)),
                         ],
                         selectedKey: _segmentKey(c.activeTool),
                         onSelect: (k) {
@@ -817,8 +827,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           c.setTool(_segmentTool(k));
                         },
                         active: c.activeTool == EditorTool.line ||
-                            c.activeTool == EditorTool.circle ||
-                            c.activeTool == EditorTool.join,
+                            c.activeTool == EditorTool.circle,
                         onActivate: () {
                           c.setTool(_segmentTool(_lastSegmentKey));
                         },
