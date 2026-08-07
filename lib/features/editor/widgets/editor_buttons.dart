@@ -232,41 +232,14 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
         if (mounted && !widget.active) _close();
       });
     }
-    final palette = Theme.of(context).appColors;
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
-      children: [
-        CompositedTransformTarget(
-          link: _layerLink,
-          child: EditorIconButton(
-            icon: _selected.icon,
-            active: widget.active,
-            color: _selected.color,
-            onTap: _handleMainTap,
-          ),
-        ),
-        // Sub-tool indicator dot, top-right: grey when inactive, white when
-        // the tool is active.
-        Positioned(
-          top: -1,
-          right: -1,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: widget.active
-                  ? Colors.white
-                  : palette.textSecondary,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: palette.background,
-                width: 1.5,
-              ),
-            ),
-          ),
-        ),
-      ],
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: EditorIconButton(
+        icon: _selected.icon,
+        active: widget.active,
+        color: _selected.color,
+        onTap: _handleMainTap,
+      ),
     );
   }
 }
