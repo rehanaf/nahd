@@ -871,9 +871,9 @@ class _EditorScreenState extends State<EditorScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                // Tombol 3: Dynamic Circle Color Picker untuk segment terpilih
+                                // Tombol 3: Dynamic Circle Color Picker untuk segment terpilih (Stroke Color)
                                 Tooltip(
-                                  message: 'Segment Color Picker',
+                                  message: 'Segment Stroke Color',
                                   child: EditorIconButton(
                                     icon: Icons.circle,
                                     color: parseHexColor(seg.color) ?? const Color(0xFF22C55E),
@@ -892,6 +892,65 @@ class _EditorScreenState extends State<EditorScreen> {
                                     },
                                   ),
                                 ),
+                                // Tombol 4: Dynamic Circle Color Picker untuk segment terpilih (Fill Color - Circle Only)
+                                if (seg.type == 'circle') ...[
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Segment Fill Color',
+                                    child: EditorIconButton(
+                                      icon: Icons.circle_outlined,
+                                      color: parseHexColor(seg.fillColor) ?? Colors.white,
+                                      onTap: () async {
+                                        final Color? picked = await showColorPickerSheet(
+                                          btnCtx,
+                                          parseHexColor(seg.fillColor) ?? Colors.white,
+                                        );
+                                        if (picked != null) {
+                                          setState(() {
+                                            seg.fillColor = colorToHex(picked);
+                                            seg.filled = true;
+                                          });
+                                          c.forceUpdate();
+                                          c.pushHistory();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                                // Tombol 5: Upload/Replace Image untuk segment terpilih (Image Only)
+                                if (seg.type == 'image') ...[
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Replace Image Source',
+                                    child: EditorIconButton(
+                                      icon: Icons.image_search,
+                                      color: const Color(0xFF10B981),
+                                      onTap: () async {
+                                        try {
+                                          final result = await FilePicker.pickFiles(
+                                            type: FileType.image,
+                                            withData: true,
+                                          );
+                                          if (result != null && result.files.isNotEmpty) {
+                                            final bytes = result.files.first.bytes;
+                                            if (bytes != null) {
+                                              final ext = result.files.first.extension ?? 'png';
+                                              final b64 = base64Encode(bytes);
+                                              final dataUri = 'data:image/$ext;base64,$b64';
+                                              setState(() {
+                                                seg.imageData = dataUri;
+                                              });
+                                              c.forceUpdate();
+                                              c.pushHistory();
+                                            }
+                                          }
+                                        } catch (err) {
+                                          debugPrint("Error replacing image: $err");
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ],
                             ],
                           );
