@@ -71,8 +71,8 @@ class ColorCircle extends StatelessWidget {
         height: 32,
         alignment: Alignment.center,
         child: Container(
-          width: 24,
-          height: 24,
+          width: 28,
+          height: 28,
           decoration: BoxDecoration(
             color: disabled ? palette.border : color,
             shape: BoxShape.circle,
@@ -225,8 +225,8 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
                   ? Alignment.topCenter
                   : Alignment.topLeft,
               offset: widget.placement == ToolGroupPlacement.bottom
-                  ? const Offset(0, 4)
-                  : const Offset(4, 0),
+                  ? const Offset(0, 8)
+                  : const Offset(8, 0),
               child: Material(
                 type: MaterialType.transparency,
                 child: GestureDetector(
