@@ -38,12 +38,9 @@ class AnimationTransport extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.skip_previous, size: 16),
-            color: palette.text,
-            onPressed: goPrev,
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
+          EditorIconButton(
+            icon: Icons.skip_previous,
+            onTap: goPrev,
           ),
           Text(
             '${currentFrame + 1} / $totalFrames',
@@ -53,12 +50,9 @@ class AnimationTransport extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.skip_next, size: 16),
-            color: palette.text,
-            onPressed: goNext,
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
+          EditorIconButton(
+            icon: Icons.skip_next,
+            onTap: goNext,
           ),
           Container(width: 1, height: 20, color: palette.border),
           const SizedBox(width: 2),
