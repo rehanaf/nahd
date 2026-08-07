@@ -539,94 +539,117 @@ class _EditorScreenState extends State<EditorScreen> {
             left: 4 + pad.left,
             child: OverlayCapsule(
               padding: const EdgeInsets.all(4),
-              child: Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (c.isAnimateMode) ...[
-                    EditorIconButton(
-                      icon: Icons.create_new_folder,
-                      color: const Color(0xFF22C55E),
-                      onTap: _openAddFigure,
-                    ),
-                    const Divider(height: 8),
-                  ],
-                  ToolGroupButton(
-                    subTools: const [
-                      ToolGroupSub(
-                          icon: Icons.control_point,
-                          key: 'newSegment',
-                          color: Color(0xFF8B5CF6)),
-                      ToolGroupSub(
-                          icon: Icons.edit,
-                          key: 'line',
-                          color: Color(0xFF22C55E)),
-                      ToolGroupSub(
-                          icon: Icons.panorama_fish_eye,
-                          key: 'circle',
-                          color: Color(0xFF22C55E)),
-                      ToolGroupSub(
-                          icon: Icons.join_inner,
-                          key: 'join',
-                          color: Color(0xFFF97316)),
+                  // Left column
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (c.isAnimateMode) ...[
+                        EditorIconButton(
+                          icon: Icons.create_new_folder,
+                          color: const Color(0xFF22C55E),
+                          onTap: _openAddFigure,
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      ToolGroupButton(
+                        subTools: const [
+                          ToolGroupSub(
+                              icon: Icons.control_point,
+                              key: 'newSegment',
+                              color: Color(0xFF8B5CF6)),
+                          ToolGroupSub(
+                              icon: Icons.edit,
+                              key: 'line',
+                              color: Color(0xFF22C55E)),
+                          ToolGroupSub(
+                              icon: Icons.panorama_fish_eye,
+                              key: 'circle',
+                              color: Color(0xFF22C55E)),
+                          ToolGroupSub(
+                              icon: Icons.join_inner,
+                              key: 'join',
+                              color: Color(0xFFF97316)),
+                        ],
+                        selectedKey: _segmentKey(c.activeTool),
+                        onSelect: (k) {
+                          setState(() => _lastSegmentKey = k);
+                          if (k == 'newSegment') {
+                            _openNewSegment();
+                          } else {
+                            c.setTool(_segmentTool(k));
+                          }
+                        },
+                        active: c.activeTool == EditorTool.line ||
+                            c.activeTool == EditorTool.circle ||
+                            c.activeTool == EditorTool.join ||
+                            _lastSegmentKey == 'newSegment',
+                        onActivate: () {
+                          if (_lastSegmentKey == 'newSegment') {
+                            _openNewSegment();
+                          } else {
+                            c.setTool(_segmentTool(_lastSegmentKey));
+                          }
+                        },
+                        placement: ToolGroupPlacement.right,
+                      ),
+                      const SizedBox(height: 4),
+                      Tooltip(
+                        message: 'Flip',
+                        child: EditorIconButton(
+                          icon: Icons.swap_horiz,
+                          disabled: !canFlip,
+                          onTap: _handleFlip,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      EditorIconButton(
+                        icon: Icons.keyboard_arrow_up,
+                        disabled: !canFlip,
+                        onTap: _layerUp,
+                      ),
                     ],
-                    selectedKey: _segmentKey(c.activeTool),
-                    onSelect: (k) {
-                      setState(() => _lastSegmentKey = k);
-                      if (k == 'newSegment') {
-                        _openNewSegment();
-                      } else {
-                        c.setTool(_segmentTool(k));
-                      }
-                    },
-                    active: c.activeTool == EditorTool.line ||
-                        c.activeTool == EditorTool.circle ||
-                        c.activeTool == EditorTool.join ||
-                        _lastSegmentKey == 'newSegment',
-                    onActivate: () {
-                      if (_lastSegmentKey == 'newSegment') {
-                        _openNewSegment();
-                      } else {
-                        c.setTool(_segmentTool(_lastSegmentKey));
-                      }
-                    },
-                    placement: ToolGroupPlacement.right,
                   ),
-                  const Divider(height: 8),
-                  Tooltip(
-                    message: 'Flip',
-                    child: EditorIconButton(
-                      icon: Icons.swap_horiz,
-                      disabled: !canFlip,
-                      onTap: _handleFlip,
-                    ),
-                  ),
-                  _LineCapButton(
-                    selectedSeg: canFlip
-                        ? c.figure.getSegment(c.selectedSegmentId!)
-                        : null,
-                    onTap: _cycleLineCap,
-                  ),
-                  if (c.selectedPointIndex != null &&
-                      c.selectedPointIndex! < c.figure.points.length) ...[
-                    EditorIconButton(
-                      icon: c.pointModes[c.selectedPointIndex] == 'static'
-                          ? Icons.lock
-                          : Icons.lock_open,
-                      color: const Color(0xFF2563EB),
-                      active: c.pointModes[c.selectedPointIndex] == 'static',
-                      onTap: () => c.togglePointMode(c.selectedPointIndex!),
-                    ),
-                  ],
-                  const Divider(height: 8),
-                  EditorIconButton(
-                    icon: Icons.keyboard_arrow_up,
-                    disabled: !canFlip,
-                    onTap: _layerUp,
-                  ),
-                  EditorIconButton(
-                    icon: Icons.keyboard_arrow_down,
-                    disabled: !canFlip,
-                    onTap: _layerDown,
+                  const SizedBox(width: 4),
+                  // Right column
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Placeholder/Point lock mode
+                      if (c.selectedPointIndex != null &&
+                          c.selectedPointIndex! < c.figure.points.length) ...[
+                        EditorIconButton(
+                          icon: c.pointModes[c.selectedPointIndex] == 'static'
+                              ? Icons.lock
+                              : Icons.lock_open,
+                          color: const Color(0xFF2563EB),
+                          active: c.pointModes[c.selectedPointIndex] == 'static',
+                          onTap: () => c.togglePointMode(c.selectedPointIndex!),
+                        ),
+                      ] else ...[
+                        // Maintain vertical alignment if point mode is hidden
+                        const SizedBox(width: 32, height: 32),
+                      ],
+                      const SizedBox(height: 4),
+                      _LineCapButton(
+                        selectedSeg: canFlip
+                            ? c.figure.getSegment(c.selectedSegmentId!)
+                            : null,
+                        onTap: _cycleLineCap,
+                      ),
+                      const SizedBox(height: 4),
+                      // Maintain vertical alignment for segment / flip spacers
+                      const SizedBox(width: 32, height: 32),
+                      const SizedBox(height: 4),
+                      EditorIconButton(
+                        icon: Icons.keyboard_arrow_down,
+                        disabled: !canFlip,
+                        onTap: _layerDown,
+                      ),
+                    ],
                   ),
                 ],
               ),
