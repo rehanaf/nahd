@@ -1062,8 +1062,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             // Stroke Color
                             Tooltip(
                               message: 'Stroke Color',
-                              child: EditorIconButton(
-                                icon: Icons.circle,
+                              child: ColorCircle(
                                 color: seg != null
                                     ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
                                     : const Color(0xFF22C55E),
@@ -1086,8 +1085,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               const SizedBox(height: 4),
                               Tooltip(
                                 message: 'Fill Color',
-                                child: EditorIconButton(
-                                  icon: Icons.circle,
+                                child: ColorCircle(
                                   color: parseHexColor(seg.fillColor) ?? Colors.white,
                                   onTap: () async {
                                     final Color? picked = await showColorPickerSheet(
@@ -1110,8 +1108,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               const SizedBox(height: 4),
                               Tooltip(
                                 message: 'Cycle (${entry.key})',
-                                child: EditorIconButton(
-                                  icon: Icons.circle,
+                                child: ColorCircle(
                                   color: parseHexColor(entry.value.fillColor) ?? const Color(0xFF9CA3AF),
                                   onTap: () async {
                                     final Color? picked = await showColorPickerSheet(

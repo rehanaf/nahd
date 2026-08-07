@@ -46,6 +46,48 @@ class EditorIconButton extends StatelessWidget {
   }
 }
 
+/// A tappable color circle button for color pickers in the sidebar.
+/// Renders a filled circle using the given [color] at 24x24 inside a 32x32 hit area.
+class ColorCircle extends StatelessWidget {
+  final Color color;
+  final bool disabled;
+  final VoidCallback? onTap;
+
+  const ColorCircle({
+    super.key,
+    required this.color,
+    this.disabled = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = Theme.of(context).appColors;
+    return InkWell(
+      onTap: disabled ? null : onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: disabled ? palette.border : color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: palette.textSecondary.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
 /// A transparent overlay capsule (used for top bar / sidebars).
 class OverlayCapsule extends StatelessWidget {
   final Widget child;
@@ -202,19 +244,25 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
   }
 
   Widget _subBar() {
-    final subs = [
-      for (final s in widget.subTools)
-        EditorIconButton(
-          icon: s.icon,
-          active: s.key == widget.selectedKey,
-          color: s.color,
-          onTap: () {
-            print("Dropdown item tapped: key=${s.key}, selectedKey=${widget.selectedKey}");
-            widget.onSelect(s.key);
-            _close();
-          },
-        ),
-    ];
+    final subs = <Widget>[];
+    for (int i = 0; i < widget.subTools.length; i++) {
+      final s = widget.subTools[i];
+      if (i > 0) {
+        subs.add(widget.placement == ToolGroupPlacement.bottom
+            ? const SizedBox(width: 4)
+            : const SizedBox(height: 4));
+      }
+      subs.add(EditorIconButton(
+        icon: s.icon,
+        active: s.key == widget.selectedKey,
+        color: s.color,
+        onTap: () {
+          print("Dropdown item tapped: key=${s.key}, selectedKey=${widget.selectedKey}");
+          widget.onSelect(s.key);
+          _close();
+        },
+      ));
+    }
     return OverlayCapsule(
       padding: const EdgeInsets.all(4),
       child: widget.placement == ToolGroupPlacement.bottom
