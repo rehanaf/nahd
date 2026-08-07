@@ -68,19 +68,6 @@ class _EditorScreenState extends State<EditorScreen> {
     c.pushHistory();
   }
 
-  void _cycleLineCap() {
-    final c = widget.controller;
-    final segId = c.selectedSegmentId;
-    if (segId == null) return;
-    final seg = c.figure.getSegment(segId);
-    if (seg == null) return;
-    const caps = ['round', 'square', 'butt'];
-    final idx = caps.indexOf(seg.lineCap);
-    seg.lineCap = caps[(idx + 1) % caps.length];
-    c.forceUpdate();
-    c.pushHistory();
-  }
-
   void _layerUp() {
     final c = widget.controller;
     final segId = c.selectedSegmentId;
@@ -779,7 +766,7 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
           ),
 
-          // Left sidebar — tab-based: Capsule 1 = tabs, Capsule 2 = content.
+          // Left sidebar — 5-tab system: Capsule 1 = tabs, Capsule 2 = content.
           Positioned(
             top: 48,
             left: 4 + pad.left,
@@ -787,57 +774,67 @@ class _EditorScreenState extends State<EditorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Capsule 1: Tab buttons (always 2 tabs visible)
+                // Capsule 1: Tab icons (always 5 tabs visible)
                 OverlayCapsule(
                   padding: const EdgeInsets.all(4),
-                  child: Builder(
-                    builder: (btnCtx) {
-                      final activeTool = c.activeTool;
-                      final seg = c.selectedSegmentId != null
-                          ? c.figure.getSegment(c.selectedSegmentId!)
-                          : null;
-
-                      // Dynamic icon for tab 0 (drawing tool)
-                      IconData toolIcon = Icons.edit;
-                      Color toolIconColor = seg != null
-                          ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
-                          : const Color(0xFF22C55E);
-                      if (activeTool == EditorTool.circle) {
-                        toolIcon = Icons.panorama_fish_eye;
-                      } else if (activeTool == EditorTool.image) {
-                        toolIcon = Icons.image;
-                      } else if (activeTool == EditorTool.none) {
-                        toolIcon = Icons.visibility_off;
-                        if (seg == null) toolIconColor = Colors.grey;
-                      }
-
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Tab 0: Drawing / Segment
-                          Tooltip(
-                            message: 'Drawing Tools',
-                            child: EditorIconButton(
-                              icon: toolIcon,
-                              color: toolIconColor,
-                              active: _sideTab == 0,
-                              onTap: () => setState(() => _sideTab = 0),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Tab 1: Utility tools
-                          Tooltip(
-                            message: 'Utility Tools',
-                            child: EditorIconButton(
-                              icon: Icons.build_outlined,
-                              color: const Color(0xFFA78BFA),
-                              active: _sideTab == 1,
-                              onTap: () => setState(() => _sideTab = 1),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Tab 0: Draw Tools
+                      Tooltip(
+                        message: 'Draw Tools',
+                        child: EditorIconButton(
+                          icon: Icons.edit,
+                          color: const Color(0xFF22C55E),
+                          active: _sideTab == 0,
+                          onTap: () => setState(() => _sideTab = 0),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Tab 1: Type Tools
+                      Tooltip(
+                        message: 'Type Tools',
+                        child: EditorIconButton(
+                          icon: Icons.category,
+                          color: const Color(0xFF3B82F6),
+                          active: _sideTab == 1,
+                          onTap: () => setState(() => _sideTab = 1),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Tab 2: Linejoin Tools
+                      Tooltip(
+                        message: 'Linejoin Tools',
+                        child: EditorIconButton(
+                          icon: Icons.line_style,
+                          color: const Color(0xFFF97316),
+                          active: _sideTab == 2,
+                          onTap: () => setState(() => _sideTab = 2),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Tab 3: Appearance Tools
+                      Tooltip(
+                        message: 'Appearance',
+                        child: EditorIconButton(
+                          icon: Icons.palette,
+                          color: const Color(0xFFEC4899),
+                          active: _sideTab == 3,
+                          onTap: () => setState(() => _sideTab = 3),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Tab 4: Segment Tools
+                      Tooltip(
+                        message: 'Segment Tools',
+                        child: EditorIconButton(
+                          icon: Icons.layers,
+                          color: const Color(0xFFA78BFA),
+                          active: _sideTab == 4,
+                          onTap: () => setState(() => _sideTab = 4),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -852,154 +849,290 @@ class _EditorScreenState extends State<EditorScreen> {
                           : null;
 
                       if (_sideTab == 0) {
-                        // ── Tab 0: Drawing tool switcher + segment controls ──
-                        final isDrawingTool = activeTool == EditorTool.line ||
-                            activeTool == EditorTool.circle ||
-                            activeTool == EditorTool.image ||
-                            activeTool == EditorTool.none;
-
+                        // ── Tab 0: Draw Tools (s=switch) Line, Circle, Image, None ──
                         return Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Switch Drawing Tool
                             Tooltip(
-                              message: 'Switch Tool: ${activeTool.name.toUpperCase()}',
+                              message: 'Line Tool',
                               child: EditorIconButton(
-                                icon: Icons.swap_vert,
+                                icon: Icons.edit,
                                 color: const Color(0xFF22C55E),
-                                active: isDrawingTool,
+                                active: activeTool == EditorTool.line,
+                                onTap: () { c.setTool(EditorTool.line); setState(() {}); },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Circle Tool',
+                              child: EditorIconButton(
+                                icon: Icons.panorama_fish_eye,
+                                color: const Color(0xFF22C55E),
+                                active: activeTool == EditorTool.circle,
+                                onTap: () { c.setTool(EditorTool.circle); setState(() {}); },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Image Tool',
+                              child: EditorIconButton(
+                                icon: Icons.image,
+                                color: const Color(0xFF22C55E),
+                                active: activeTool == EditorTool.image,
+                                onTap: () { c.setTool(EditorTool.image); setState(() {}); },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'None Tool',
+                              child: EditorIconButton(
+                                icon: Icons.visibility_off,
+                                color: Colors.grey,
+                                active: activeTool == EditorTool.none,
+                                onTap: () { c.setTool(EditorTool.none); setState(() {}); },
+                              ),
+                            ),
+                          ],
+                        );
+                      } else if (_sideTab == 1) {
+                        // ── Tab 1: Type Tools (s=switch) change selected segment type ──
+                        final segType = seg?.type ?? 'line';
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: 'Type: Line',
+                              child: EditorIconButton(
+                                icon: Icons.edit,
+                                color: const Color(0xFF3B82F6),
+                                active: segType == 'line',
+                                disabled: seg == null,
                                 onTap: () {
-                                  EditorTool nextTool = EditorTool.line;
-                                  if (activeTool == EditorTool.line) {
-                                    nextTool = EditorTool.circle;
-                                  } else if (activeTool == EditorTool.circle) {
-                                    nextTool = EditorTool.image;
-                                  } else if (activeTool == EditorTool.image) {
-                                    nextTool = EditorTool.none;
-                                  } else {
-                                    nextTool = EditorTool.line;
-                                  }
-                                  c.setTool(nextTool);
-                                  setState(() {});
+                                  if (seg == null) return;
+                                  setState(() { seg.type = 'line'; seg.filled = true; });
+                                  c.forceUpdate(); c.pushHistory();
                                 },
                               ),
                             ),
-                            // Selected segment controls
-                            if (seg != null) ...[
-                              const SizedBox(height: 4),
-                              // Switch Selected Segment Type
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Type: Circle',
+                              child: EditorIconButton(
+                                icon: Icons.panorama_fish_eye,
+                                color: const Color(0xFF3B82F6),
+                                active: segType == 'circle',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() { seg.type = 'circle'; seg.filled = false; });
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Type: Image',
+                              child: EditorIconButton(
+                                icon: Icons.image,
+                                color: const Color(0xFF3B82F6),
+                                active: segType == 'image',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() { seg.type = 'image'; seg.filled = true; });
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Type: None',
+                              child: EditorIconButton(
+                                icon: Icons.visibility_off,
+                                color: Colors.grey,
+                                active: segType == 'none',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() { seg.type = 'none'; seg.filled = false; });
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      } else if (_sideTab == 2) {
+                        // ── Tab 2: Linejoin Tools (s=switch) Round, Miter, Bevel ──
+                        final cap = seg?.lineCap ?? 'round';
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: 'Round',
+                              child: EditorIconButton(
+                                icon: Icons.circle_outlined,
+                                color: const Color(0xFFF97316),
+                                active: cap == 'round',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() => seg.lineCap = 'round');
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Square',
+                              child: EditorIconButton(
+                                icon: Icons.square_outlined,
+                                color: const Color(0xFFF97316),
+                                active: cap == 'square',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() => seg.lineCap = 'square');
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Butt',
+                              child: EditorIconButton(
+                                icon: Icons.remove,
+                                color: const Color(0xFFF97316),
+                                active: cap == 'butt',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() => seg.lineCap = 'butt');
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      } else if (_sideTab == 3) {
+                        // ── Tab 3: Appearance Tools ──
+                        // Collect cycle fills relevant to selected segment
+                        final List<MapEntry<String, CycleFill>> segCycles = [];
+                        if (seg != null) {
+                          c.figure.cycleFills.forEach((key, cf) {
+                            final pts = key.split(',').map((p) => int.tryParse(p) ?? -1).toList();
+                            if (pts.contains(seg.point1Index) && pts.contains(seg.point2Index)) {
+                              segCycles.add(MapEntry(key, cf));
+                            }
+                          });
+                        }
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Image replace (if image type)
+                            if (seg != null && seg.type == 'image') ...[
                               Tooltip(
-                                message: 'Switch Type (${seg.type})',
+                                message: 'Replace Image',
                                 child: EditorIconButton(
-                                  icon: Icons.loop,
-                                  color: const Color(0xFF3B82F6),
-                                  onTap: () {
-                                    final oldType = seg.type;
-                                    String nextType = 'line';
-                                    if (oldType == 'line') {
-                                      nextType = 'circle';
-                                    } else if (oldType == 'circle') {
-                                      nextType = 'image';
-                                    } else if (oldType == 'image') {
-                                      nextType = 'none';
-                                    } else {
-                                      nextType = 'line';
+                                  icon: Icons.image_search,
+                                  color: const Color(0xFF10B981),
+                                  onTap: () async {
+                                    try {
+                                      final result = await FilePicker.pickFiles(
+                                        type: FileType.image,
+                                        withData: true,
+                                      );
+                                      if (result != null && result.files.isNotEmpty) {
+                                        final bytes = result.files.first.bytes;
+                                        if (bytes != null) {
+                                          final ext = result.files.first.extension ?? 'png';
+                                          final b64 = base64Encode(bytes);
+                                          final dataUri = 'data:image/$ext;base64,$b64';
+                                          setState(() { seg.imageData = dataUri; });
+                                          c.forceUpdate(); c.pushHistory();
+                                        }
+                                      }
+                                    } catch (err) {
+                                      debugPrint("Error replacing image: $err");
                                     }
-                                    setState(() {
-                                      seg.type = nextType;
-                                      seg.filled = nextType != 'circle' && nextType != 'none';
-                                    });
-                                    c.forceUpdate();
-                                    c.pushHistory();
                                   },
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              // Stroke Color
+                            ],
+                            // Stroke Color
+                            Tooltip(
+                              message: 'Stroke Color',
+                              child: EditorIconButton(
+                                icon: Icons.circle,
+                                color: seg != null
+                                    ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
+                                    : const Color(0xFF22C55E),
+                                disabled: seg == null,
+                                onTap: () async {
+                                  if (seg == null) return;
+                                  final Color? picked = await showColorPickerSheet(
+                                    btnCtx,
+                                    parseHexColor(seg.color) ?? Colors.black,
+                                  );
+                                  if (picked != null) {
+                                    setState(() { seg.color = colorToHex(picked); });
+                                    c.forceUpdate(); c.pushHistory();
+                                  }
+                                },
+                              ),
+                            ),
+                            // Fill Color (Circle Only)
+                            if (seg != null && seg.type == 'circle') ...[
+                              const SizedBox(height: 4),
                               Tooltip(
-                                message: 'Stroke Color',
+                                message: 'Fill Color',
                                 child: EditorIconButton(
                                   icon: Icons.circle,
-                                  color: parseHexColor(seg.color) ?? const Color(0xFF22C55E),
+                                  color: parseHexColor(seg.fillColor) ?? Colors.white,
                                   onTap: () async {
                                     final Color? picked = await showColorPickerSheet(
                                       btnCtx,
-                                      parseHexColor(seg.color) ?? Colors.black,
+                                      parseHexColor(seg.fillColor) ?? Colors.white,
                                     );
                                     if (picked != null) {
                                       setState(() {
-                                        seg.color = colorToHex(picked);
+                                        seg.fillColor = colorToHex(picked);
+                                        seg.filled = true;
                                       });
-                                      c.forceUpdate();
-                                      c.pushHistory();
+                                      c.forceUpdate(); c.pushHistory();
                                     }
                                   },
                                 ),
                               ),
-                              // Fill Color (Circle Only)
-                              if (seg.type == 'circle') ...[
-                                const SizedBox(height: 4),
-                                Tooltip(
-                                  message: 'Fill Color',
-                                  child: EditorIconButton(
-                                    icon: Icons.circle,
-                                    color: parseHexColor(seg.fillColor) ?? Colors.white,
-                                    onTap: () async {
-                                      final Color? picked = await showColorPickerSheet(
-                                        btnCtx,
-                                        parseHexColor(seg.fillColor) ?? Colors.white,
-                                      );
-                                      if (picked != null) {
-                                        setState(() {
-                                          seg.fillColor = colorToHex(picked);
-                                          seg.filled = true;
-                                        });
-                                        c.forceUpdate();
-                                        c.pushHistory();
-                                      }
-                                    },
-                                  ),
+                            ],
+                            // Cycle Fill Colors
+                            for (final entry in segCycles) ...[
+                              const SizedBox(height: 4),
+                              Tooltip(
+                                message: 'Cycle (${entry.key})',
+                                child: EditorIconButton(
+                                  icon: Icons.circle,
+                                  color: parseHexColor(entry.value.fillColor) ?? const Color(0xFF9CA3AF),
+                                  onTap: () async {
+                                    final Color? picked = await showColorPickerSheet(
+                                      btnCtx,
+                                      parseHexColor(entry.value.fillColor) ?? Colors.grey,
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        entry.value.fillColor = colorToHex(picked);
+                                        entry.value.filled = true;
+                                      });
+                                      c.forceUpdate(); c.pushHistory();
+                                    }
+                                  },
                                 ),
-                              ],
-                              // Replace Image (Image Only)
-                              if (seg.type == 'image') ...[
-                                const SizedBox(height: 4),
-                                Tooltip(
-                                  message: 'Replace Image',
-                                  child: EditorIconButton(
-                                    icon: Icons.image_search,
-                                    color: const Color(0xFF10B981),
-                                    onTap: () async {
-                                      try {
-                                        final result = await FilePicker.pickFiles(
-                                          type: FileType.image,
-                                          withData: true,
-                                        );
-                                        if (result != null && result.files.isNotEmpty) {
-                                          final bytes = result.files.first.bytes;
-                                          if (bytes != null) {
-                                            final ext = result.files.first.extension ?? 'png';
-                                            final b64 = base64Encode(bytes);
-                                            final dataUri = 'data:image/$ext;base64,$b64';
-                                            setState(() {
-                                              seg.imageData = dataUri;
-                                            });
-                                            c.forceUpdate();
-                                            c.pushHistory();
-                                          }
-                                        }
-                                      } catch (err) {
-                                        debugPrint("Error replacing image: $err");
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
+                              ),
                             ],
                           ],
                         );
                       } else {
-                        // ── Tab 1: Utility tools ──
+                        // ── Tab 4: Segment Tools ──
                         return Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1017,13 +1150,6 @@ class _EditorScreenState extends State<EditorScreen> {
                             ] else ...[
                               const SizedBox(width: 32, height: 32),
                             ],
-                            const SizedBox(height: 4),
-                            _LineCapButton(
-                              selectedSeg: canFlip
-                                  ? c.figure.getSegment(c.selectedSegmentId!)
-                                  : null,
-                              onTap: _cycleLineCap,
-                            ),
                             const SizedBox(height: 4),
                             Tooltip(
                               message: 'Flip',

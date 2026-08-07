@@ -3,44 +3,6 @@ part of 'editor_screen.dart';
 // =========================================================================
 // Sidebar buttons & modal sheets
 // =========================================================================
-class _LineCapButton extends StatelessWidget {
-  final Segment? selectedSeg;
-  final VoidCallback onTap;
-
-  const _LineCapButton({required this.selectedSeg, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = Theme.of(context).appColors;
-    final disabled = selectedSeg == null;
-    String letter = '-';
-    if (selectedSeg != null) {
-      letter = switch (selectedSeg!.lineCap) {
-        'round' => 'R',
-        'square' => 'S',
-        'butt' => 'B',
-        _ => '-',
-      };
-    }
-    return InkWell(
-      onTap: disabled ? null : onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 32,
-        height: 32,
-        alignment: Alignment.center,
-        child: Text(
-          letter,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: disabled ? palette.border : palette.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _MenuItem extends StatelessWidget {
   final IconData icon;

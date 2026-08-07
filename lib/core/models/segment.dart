@@ -66,6 +66,7 @@ class Segment {
   String? fillColor;
   double width;
   String lineCap; // 'round' | 'square' | 'butt'
+  String lineJoin; // 'round' | 'miter' | 'bevel'
   int layer;
   bool curved;
   double curvature;
@@ -92,6 +93,7 @@ class Segment {
         fillColor = null,
         width = 16,
         lineCap = 'round',
+        lineJoin = 'round',
         layer = 0,
         curved = false,
         curvature = 0.3,
@@ -127,6 +129,7 @@ class Segment {
         'fillColor': fillColor,
         'width': width,
         'lineCap': lineCap,
+        'lineJoin': lineJoin,
         'layer': layer,
         'curved': curved,
         'curvature': curvature,
@@ -152,6 +155,7 @@ class Segment {
     seg.fillColor = data['fillColor'] as String?;
     seg.width = (data['width'] as num?)?.toDouble() ?? 16;
     seg.lineCap = data['lineCap'] as String? ?? 'round';
+    seg.lineJoin = data['lineJoin'] as String? ?? 'round';
     seg.layer = (data['layer'] as num?)?.toInt() ?? 0;
     seg.curved = data['curved'] as bool? ?? false;
     seg.curvature = (data['curvature'] as num?)?.toDouble() ?? 0.3;
