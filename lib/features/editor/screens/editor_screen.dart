@@ -99,6 +99,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _ => 'point',
       };
     }
+    print("Mapper _modifyKey activeTool: $t, returning $_lastModifyKey");
     return _lastModifyKey;
   }
 
@@ -122,6 +123,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _ => 'moveAll',
       };
     }
+    print("Mapper _transformKey activeTool: $t, returning $_lastTransformKey");
     return _lastTransformKey;
   }
 
@@ -139,12 +141,15 @@ class _EditorScreenState extends State<EditorScreen> {
 
   String _segmentKey(EditorTool t) {
     if (_isSegmentTool(t)) {
-      _lastSegmentKey = switch (t) {
-        EditorTool.circle => 'circle',
-        EditorTool.join => 'join',
-        _ => 'line',
-      };
+      if (_lastSegmentKey != 'newSegment' || t != _segmentTool(_lastSegmentKey)) {
+        _lastSegmentKey = switch (t) {
+          EditorTool.circle => 'circle',
+          EditorTool.join => 'join',
+          _ => 'line',
+        };
+      }
     }
+    print("Mapper _segmentKey activeTool: $t, returning $_lastSegmentKey");
     return _lastSegmentKey;
   }
 

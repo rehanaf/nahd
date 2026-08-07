@@ -211,6 +211,7 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
           active: s.key == widget.selectedKey,
           color: s.color,
           onTap: () {
+            print("Dropdown item tapped: key=${s.key}, selectedKey=${widget.selectedKey}");
             widget.onSelect(s.key);
             _close();
           },
