@@ -122,7 +122,7 @@ extension _TransformTools on _FigureCanvasState {
     }
 
     final subRoot = _rootOfPoint(fig, ptHit);
-    // 1. Root points should NEVER rotate. Returning false lets the canvas fallback to dragging/moving the whole sub-figure.
+    // 1. Root points should NEVER rotate.
     if (ptHit == subRoot) {
       return false;
     }
@@ -136,6 +136,8 @@ extension _TransformTools on _FigureCanvasState {
       widget.controller.forceUpdate();
       return false;
     }
+
+    // Build adjacency
     final adj = <int, List<int>>{};
     for (final i in comp) {
       adj[i] = [];
@@ -148,38 +150,104 @@ extension _TransformTools on _FigureCanvasState {
       adj[s.point2Index]!.add(s.point1Index);
     }
 
-    // 2. Build Spanning Tree (BFS) from subRoot to establish parent-child relationships.
-    // This handles any complex cycles by treating back-edges as secondary.
+    // DFS to find the local cycle loop that contains ptHit
+    final localCycleNodes = <int>{};
+    final path = <int>[];
+    final visitedDFS = <int>{};
+
+    void findCycle(int u, int p) {
+      visitedDFS.add(u);
+      path.add(u);
+      for (final v in adj[u]!) {
+        if (v == p) continue;
+        if (visitedDFS.contains(v)) {
+          final idx = path.indexOf(v);
+          if (idx != -1) {
+            final cycle = path.sublist(idx);
+            if (cycle.contains(ptHit)) {
+              localCycleNodes.addAll(cycle);
+            }
+          }
+        } else {
+          findCycle(v, u);
+        }
+      }
+      path.removeLast();
+      visitedDFS.remove(u);
+    }
+
+    findCycle(ptHit, -1);
+
+    final isCycle = localCycleNodes.isNotEmpty;
+
+    // Spanning tree from subRoot to know depths and parents
     final parent = <int, int>{};
-    final visited = <int>{subRoot};
+    final depth = <int, int>{subRoot: 0};
     final queue = <int>[subRoot];
+    final visitedBFS = <int>{subRoot};
     while (queue.isNotEmpty) {
       final cur = queue.removeAt(0);
       for (final other in adj[cur]!) {
-        if (visited.contains(other)) continue;
-        visited.add(other);
+        if (visitedBFS.contains(other)) continue;
+        visitedBFS.add(other);
         parent[other] = cur;
+        depth[other] = depth[cur]! + 1;
         queue.add(other);
       }
     }
 
-    // 3. Center of rotation is the parent in our Spanning Tree.
-    // Fallback to neighbour if parent not found.
-    final centre = parent[ptHit] ?? (seg?.point1Index == ptHit ? seg!.point2Index : seg!.point1Index);
+    int centre;
+    List<int> rotPts;
 
-    // 4. Find all descendants (subtree points) of ptHit in the Spanning Tree.
-    // Only these points will rotate, keeping parent structures stable.
-    final rotPts = <int>[];
-    final stk = <int>[ptHit];
-    while (stk.isNotEmpty) {
-      final cur = stk.removeLast();
-      if (rotPts.contains(cur)) continue;
-      rotPts.add(cur);
-      for (final other in adj[cur]!) {
-        if (parent[other] == cur) {
-          stk.add(other);
+    if (isCycle) {
+      // Find the pivot node of the local cycle (node closest to subRoot)
+      int cyclePivot = ptHit;
+      var bestDepth = 99999;
+      for (final node in localCycleNodes) {
+        final d = depth[node];
+        if (d != null && d < bestDepth) {
+          bestDepth = d;
+          cyclePivot = node;
         }
       }
+
+      // If we clicked the pivot node, rotate the rest of the cycle around its neighbor.
+      // Otherwise, rotate the whole local cycle around cyclePivot.
+      centre = ptHit == cyclePivot
+          ? (parent[ptHit] ?? (seg?.point1Index == ptHit ? seg!.point2Index : seg!.point1Index))
+          : cyclePivot;
+
+      // Rotate all cycle nodes and their descendants, except the center and subRoot.
+      final rotSet = <int>{};
+      final stk = <int>[...localCycleNodes];
+      while (stk.isNotEmpty) {
+        final cur = stk.removeLast();
+        if (rotSet.contains(cur)) continue;
+        rotSet.add(cur);
+        for (final other in adj[cur]!) {
+          if (parent[other] == cur) {
+            stk.add(other);
+          }
+        }
+      }
+      rotSet.remove(centre);
+      rotSet.remove(subRoot);
+      rotPts = rotSet.toList();
+    } else {
+      centre = parent[ptHit] ?? (seg?.point1Index == ptHit ? seg!.point2Index : seg!.point1Index);
+      final rot = <int>[];
+      final stk = <int>[ptHit];
+      while (stk.isNotEmpty) {
+        final cur = stk.removeLast();
+        if (rot.contains(cur)) continue;
+        rot.add(cur);
+        for (final other in adj[cur]!) {
+          if (parent[other] == cur) {
+            stk.add(other);
+          }
+        }
+      }
+      rotPts = rot;
     }
 
     if (rotPts.isEmpty || centre < 0 || centre >= fig.points.length) {
