@@ -61,6 +61,7 @@ class Root extends StatefulWidget {
 class _RootState extends State<Root> {
   EditorController? _editor;
   bool _loadingEditor = false;
+  ProjectType _lastTab = ProjectType.animation;
 
   Future<void> _openProject(String id, ProjectType type) async {
     setState(() => _loadingEditor = true);
@@ -92,6 +93,11 @@ class _RootState extends State<Root> {
     if (editor != null) {
       return EditorScreen(controller: editor, onBack: _closeEditor);
     }
-    return MainMenuScreen(app: widget.app, onOpenProject: _openProject);
+    return MainMenuScreen(
+      app: widget.app,
+      onOpenProject: _openProject,
+      initialTab: _lastTab,
+      onTabChanged: (t) => _lastTab = t,
+    );
   }
 }

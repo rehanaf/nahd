@@ -46,11 +46,15 @@ class _GridItem {
 class MainMenuScreen extends StatefulWidget {
   final AppController app;
   final void Function(String id, ProjectType type) onOpenProject;
+  final ProjectType initialTab;
+  final ValueChanged<ProjectType> onTabChanged;
 
   const MainMenuScreen({
     super.key,
     required this.app,
     required this.onOpenProject,
+    required this.initialTab,
+    required this.onTabChanged,
   });
 
   @override
@@ -58,7 +62,7 @@ class MainMenuScreen extends StatefulWidget {
 }
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
-  ProjectType _tab = ProjectType.animation;
+  late ProjectType _tab;
   List<ProjectMeta> _projects = [];
   List<ProjectGroup> _groups = [];
   bool _loading = true;
@@ -69,6 +73,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   void initState() {
     super.initState();
+    _tab = widget.initialTab;
     _refresh();
   }
 
@@ -93,6 +98,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       _tab = t;
       _activeGroup = null;
     });
+    widget.onTabChanged(t);
     _refresh();
   }
 
