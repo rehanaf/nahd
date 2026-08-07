@@ -66,7 +66,7 @@ class _RootState extends State<Root> {
   Future<void> _openProject(String id, ProjectType type) async {
     setState(() => _loadingEditor = true);
     final controller = await EditorController.load(
-      mode: type == ProjectType.animation ? EditorMode.animate : EditorMode.figure,
+      mode: type == ProjectType.figure ? EditorMode.figure : EditorMode.animate,
       projectId: id,
     );
     if (!mounted) return;

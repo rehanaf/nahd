@@ -1,4 +1,4 @@
-﻿part of 'main_menu_screen.dart';
+part of 'main_menu_screen.dart';
 
 // =========================================================================
 // Project & group tiles
@@ -27,6 +27,14 @@ class _ProjectCardTileState extends State<_ProjectCardTile> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(_ProjectCardTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.meta.id != widget.meta.id) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
