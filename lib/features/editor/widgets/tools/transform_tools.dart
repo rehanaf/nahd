@@ -152,7 +152,7 @@ extension _TransformTools on _FigureCanvasState {
 
     // A node is in a cycle if it has 2 or more connections within the connected component
     final cycleNodes = comp.where((i) => adj[i]!.length >= 2).toSet();
-    final isCycle = edgeCount >= comp.length && cycleNodes.contains(ptHit) && !cycleNodes.contains(subRoot);
+    final isCycle = edgeCount >= comp.length && cycleNodes.contains(ptHit);
 
     int centre;
     List<int> rotPts;
