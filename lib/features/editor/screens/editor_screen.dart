@@ -798,22 +798,19 @@ class _EditorScreenState extends State<EditorScreen> {
                           final seg = c.selectedSegmentId != null
                               ? c.figure.getSegment(c.selectedSegmentId!)
                               : null;
-                          IconData icon = Icons.edit;
-                          Color iconColor = const Color(0xFF22C55E);
+                          IconData toolIcon = Icons.edit;
+                          Color toolIconColor = const Color(0xFF22C55E);
 
                           if (activeTool == EditorTool.circle) {
-                            icon = Icons.panorama_fish_eye;
-                            if (seg != null && seg.type == 'circle') {
-                              iconColor = parseHexColor(seg.color) ?? const Color(0xFF22C55E);
-                            }
+                            toolIcon = Icons.panorama_fish_eye;
                           } else if (activeTool == EditorTool.image) {
-                            icon = Icons.image;
+                            toolIcon = Icons.image;
                           } else if (activeTool == EditorTool.none) {
-                            icon = Icons.visibility_off;
-                            iconColor = Colors.grey;
+                            toolIcon = Icons.visibility_off;
+                            toolIconColor = Colors.grey;
                           }
 
-                          final isCurrent = activeTool == EditorTool.line ||
+                          final isDrawingTool = activeTool == EditorTool.line ||
                               activeTool == EditorTool.circle ||
                               activeTool == EditorTool.image ||
                               activeTool == EditorTool.none;
@@ -821,63 +818,13 @@ class _EditorScreenState extends State<EditorScreen> {
                           return Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              // Tombol 1: Switch Drawing Tool
                               Tooltip(
-                                message: activeTool.name.toUpperCase(),
+                                message: 'Switch Tool: ${activeTool.name.toUpperCase()}',
                                 child: EditorIconButton(
-                                  icon: icon,
-                                  color: iconColor,
-                                  active: isCurrent,
-                                  onTap: () async {
-                                    if (activeTool != EditorTool.line &&
-                                        activeTool != EditorTool.circle &&
-                                        activeTool != EditorTool.image &&
-                                        activeTool != EditorTool.none) {
-                                      c.setTool(EditorTool.line);
-                                      return;
-                                    }
-
-                                    if (activeTool == EditorTool.circle &&
-                                        seg != null &&
-                                        seg.type == 'circle') {
-                                      final Color? picked = await showColorPickerSheet(
-                                        btnCtx,
-                                        parseHexColor(seg.color) ?? Colors.black,
-                                      );
-                                      if (picked != null) {
-                                        setState(() {
-                                          seg.color = colorToHex(picked);
-                                        });
-                                        c.forceUpdate();
-                                        c.pushHistory();
-                                      }
-                                    } else if (activeTool == EditorTool.image) {
-                                      try {
-                                        final result = await FilePicker.pickFiles(
-                                          type: FileType.image,
-                                          withData: true,
-                                        );
-                                        if (result != null && result.files.isNotEmpty) {
-                                          final bytes = result.files.first.bytes;
-                                          if (bytes != null) {
-                                            final ext = result.files.first.extension ?? 'png';
-                                            final b64 = base64Encode(bytes);
-                                            final dataUri = 'data:image/$ext;base64,$b64';
-                                            c.addSegmentWithImage(dataUri);
-                                          }
-                                        }
-                                      } catch (err) {
-                                        debugPrint("Error picking image: $err");
-                                      }
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Tooltip(
-                                message: 'Switch Segment Type',
-                                child: EditorIconButton(
-                                  icon: Icons.loop,
-                                  color: palette.textSecondary,
+                                  icon: toolIcon,
+                                  color: toolIconColor,
+                                  active: isDrawingTool,
                                   onTap: () {
                                     EditorTool nextTool = EditorTool.line;
                                     if (activeTool == EditorTool.line) {
@@ -894,6 +841,58 @@ class _EditorScreenState extends State<EditorScreen> {
                                   },
                                 ),
                               ),
+                              // Tombol 2: Switch Selected Segment Type (hanya jika ada segment terpilih)
+                              if (seg != null) ...[
+                                const SizedBox(height: 4),
+                                Tooltip(
+                                  message: 'Switch Selected Type (${seg.type})',
+                                  child: EditorIconButton(
+                                    icon: Icons.loop,
+                                    color: const Color(0xFF3B82F6),
+                                    onTap: () {
+                                      final oldType = seg.type;
+                                      String nextType = 'line';
+                                      if (oldType == 'line') {
+                                        nextType = 'circle';
+                                      } else if (oldType == 'circle') {
+                                        nextType = 'image';
+                                      } else if (oldType == 'image') {
+                                        nextType = 'none';
+                                      } else {
+                                        nextType = 'line';
+                                      }
+                                      setState(() {
+                                        seg.type = nextType;
+                                        seg.filled = nextType != 'circle' && nextType != 'none';
+                                      });
+                                      c.forceUpdate();
+                                      c.pushHistory();
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                // Tombol 3: Dynamic Circle Color Picker untuk segment terpilih
+                                Tooltip(
+                                  message: 'Segment Color Picker',
+                                  child: EditorIconButton(
+                                    icon: Icons.circle,
+                                    color: parseHexColor(seg.color) ?? const Color(0xFF22C55E),
+                                    onTap: () async {
+                                      final Color? picked = await showColorPickerSheet(
+                                        btnCtx,
+                                        parseHexColor(seg.color) ?? Colors.black,
+                                      );
+                                      if (picked != null) {
+                                        setState(() {
+                                          seg.color = colorToHex(picked);
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
                             ],
                           );
                         },
