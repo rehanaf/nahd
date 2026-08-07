@@ -384,48 +384,25 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Top unified bar (Back button, Tool Mode capsule, and More menu aligned horizontally).
           Positioned(
-            top: 8 + pad.top,
-            left: 8 + pad.left,
-            right: 8 + pad.right,
+            top: 12,
+            left: 12,
+            right: 12,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Left: Back + Undo/Redo.
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    OverlayCapsule(
-                      padding: const EdgeInsets.all(4),
-                      child: SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: InkWell(
-                          onTap: widget.onBack,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Icon(Icons.arrow_back, size: 18, color: palette.text),
-                        ),
-                      ),
+                // Left: Only Back button.
+                OverlayCapsule(
+                  padding: const EdgeInsets.all(4),
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: InkWell(
+                      onTap: widget.onBack,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Icon(Icons.arrow_back, size: 18, color: palette.text),
                     ),
-                    const SizedBox(width: 4),
-                    OverlayCapsule(
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          EditorIconButton(
-                            icon: Icons.undo,
-                            disabled: !c.canUndo,
-                            onTap: c.undo,
-                          ),
-                          EditorIconButton(
-                            icon: Icons.redo,
-                            disabled: !c.canRedo,
-                            onTap: c.redo,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
 
                 // Center: Tool mode capsule.
@@ -518,18 +495,41 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ),
 
-                // Right: More (zoom) menu button.
-                OverlayCapsule(
-                  padding: const EdgeInsets.all(4),
-                  child: SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: InkWell(
-                      onTap: () => setState(() => _showMenu = !_showMenu),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Icon(Icons.more_horiz, size: 18, color: palette.text),
+                // Right: Undo/Redo (prev/next) + More (zoom) menu button.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OverlayCapsule(
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          EditorIconButton(
+                            icon: Icons.undo,
+                            disabled: !c.canUndo,
+                            onTap: c.undo,
+                          ),
+                          EditorIconButton(
+                            icon: Icons.redo,
+                            disabled: !c.canRedo,
+                            onTap: c.redo,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    OverlayCapsule(
+                      padding: const EdgeInsets.all(4),
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: InkWell(
+                          onTap: () => setState(() => _showMenu = !_showMenu),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Icon(Icons.more_horiz, size: 18, color: palette.text),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -537,8 +537,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Left sidebar.
           Positioned(
-            top: 52 + pad.top,
-            left: 4 + pad.left,
+            top: 64,
+            left: 12 + pad.left,
             child: OverlayCapsule(
               padding: const EdgeInsets.all(4),
               child: Column(
@@ -637,8 +637,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Right sidebar.
           Positioned(
-            top: (c.isAnimateMode ? 96 : 52) + pad.top,
-            right: 4 + pad.right,
+            top: c.isAnimateMode ? 108 : 64,
+            right: 12 + pad.right,
             child: OverlayCapsule(
               padding: const EdgeInsets.all(4),
               child: Column(
@@ -686,16 +686,16 @@ class _EditorScreenState extends State<EditorScreen> {
           // Transport bar.
           if (c.isAnimateMode)
             Positioned(
-              top: 52 + pad.top,
-              right: 8 + pad.right,
+              top: 64,
+              right: 12 + pad.right,
               child: AnimationTransport(controller: c),
             ),
 
           // Zoom menu dropdown.
           if (_showMenu)
             Positioned(
-              top: 56 + pad.top,
-              right: 8 + pad.right,
+              top: 64,
+              right: 12 + pad.right,
               child: EditorPanel(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
