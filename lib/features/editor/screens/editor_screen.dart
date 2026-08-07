@@ -616,6 +616,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             disabled: !c.canUndo,
                             onTap: c.undo,
                           ),
+                          const SizedBox(width: 4),
                           EditorIconButton(
                             icon: Icons.redo,
                             disabled: !c.canRedo,
@@ -660,6 +661,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         active: c.activeTool == EditorTool.rotate,
                         onTap: () => c.setTool(EditorTool.rotate),
                       ),
+                      const SizedBox(width: 4),
                       // Modify group (Point, Modify, Curve).
                       ToolGroupButton(
                         subTools: const [
@@ -685,6 +687,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         onActivate: () => c.setTool(_modifyTool(_lastModifyKey)),
                         placement: ToolGroupPlacement.bottom,
                       ),
+                      const SizedBox(width: 4),
                       // Transform group (Move All, Rotate All, Scale All).
                       ToolGroupButton(
                         subTools: const [
@@ -732,12 +735,14 @@ class _EditorScreenState extends State<EditorScreen> {
                               active: c.rigMode == RigMode.rig,
                               onTap: () => c.setRigMode(RigMode.rig),
                             ),
+                            const SizedBox(width: 4),
                             EditorIconButton(
                               icon: Icons.crop_rotate,
                               color: const Color(0xFF8B5CF6),
                               active: c.rigMode == RigMode.asset,
                               onTap: () => c.setRigMode(RigMode.asset),
                             ),
+                            const SizedBox(width: 4),
                             EditorIconButton(
                               icon: Icons.anchor,
                               color: const Color(0xFF10B981),
