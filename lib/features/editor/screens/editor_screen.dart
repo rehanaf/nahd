@@ -799,7 +799,9 @@ class _EditorScreenState extends State<EditorScreen> {
                               ? c.figure.getSegment(c.selectedSegmentId!)
                               : null;
                           IconData toolIcon = Icons.edit;
-                          Color toolIconColor = const Color(0xFF22C55E);
+                          Color toolIconColor = seg != null
+                              ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
+                              : const Color(0xFF22C55E);
 
                           if (activeTool == EditorTool.circle) {
                             toolIcon = Icons.panorama_fish_eye;
@@ -807,7 +809,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             toolIcon = Icons.image;
                           } else if (activeTool == EditorTool.none) {
                             toolIcon = Icons.visibility_off;
-                            toolIconColor = Colors.grey;
+                            if (seg == null) toolIconColor = Colors.grey;
                           }
 
                           final isDrawingTool = activeTool == EditorTool.line ||
@@ -898,7 +900,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Segment Fill Color',
                                     child: EditorIconButton(
-                                      icon: Icons.circle_outlined,
+                                      icon: Icons.circle,
                                       color: parseHexColor(seg.fillColor) ?? Colors.white,
                                       onTap: () async {
                                         final Color? picked = await showColorPickerSheet(
