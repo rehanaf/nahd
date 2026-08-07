@@ -125,6 +125,7 @@ class ToolGroupButton extends StatefulWidget {
 
 class _ToolGroupButtonState extends State<ToolGroupButton> {
   OverlayEntry? _entry;
+  final LayerLink _layerLink = LayerLink();
 
   ToolGroupSub get _selected => widget.subTools.firstWhere(
         (s) => s.key == widget.selectedKey,
@@ -159,11 +160,6 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
 
   void _open() {
     final overlayState = Overlay.of(context);
-    final overlayBox =
-        overlayState.context.findRenderObject() as RenderBox;
-    final box = context.findRenderObject() as RenderBox;
-    if (box.hasSize == false) return;
-    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlayBox);
     _entry = OverlayEntry(builder: (ctx) {
       return Stack(
         children: [
@@ -177,23 +173,25 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
             ),
           ),
           Positioned(
-            left: widget.placement == ToolGroupPlacement.bottom
-                ? topLeft.dx + box.size.width / 2
-                : topLeft.dx + box.size.width + 6,
-            top: widget.placement == ToolGroupPlacement.bottom
-                ? topLeft.dy + box.size.height + 6
-                : topLeft.dy,
-            child: Material(
-              type: MaterialType.transparency,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {}, // Blocks taps from reaching the background barrier
-                child: widget.placement == ToolGroupPlacement.bottom
-                    ? FractionalTranslation(
-                        translation: const Offset(-0.5, 0),
-                        child: _subBar(),
-                      )
-                    : _subBar(),
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              targetAnchor: widget.placement == ToolGroupPlacement.bottom
+                  ? Alignment.bottomCenter
+                  : Alignment.topRight,
+              followerAnchor: widget.placement == ToolGroupPlacement.bottom
+                  ? Alignment.topCenter
+                  : Alignment.topLeft,
+              offset: widget.placement == ToolGroupPlacement.bottom
+                  ? const Offset(0, 6)
+                  : const Offset(6, 0),
+              child: Material(
+                type: MaterialType.transparency,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {}, // Blocks taps from reaching the background barrier
+                  child: _subBar(),
+                ),
               ),
             ),
           ),
@@ -239,11 +237,14 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
       clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        EditorIconButton(
-          icon: _selected.icon,
-          active: widget.active,
-          color: _selected.color,
-          onTap: _handleMainTap,
+        CompositedTransformTarget(
+          link: _layerLink,
+          child: EditorIconButton(
+            icon: _selected.icon,
+            active: widget.active,
+            color: _selected.color,
+            onTap: _handleMainTap,
+          ),
         ),
         // Sub-tool indicator dot, top-right: grey when inactive, white when
         // the tool is active.
