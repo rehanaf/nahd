@@ -211,8 +211,8 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
           active: s.key == widget.selectedKey,
           color: s.color,
           onTap: () {
-            _close();
             widget.onSelect(s.key);
+            _close();
           },
         ),
     ];
