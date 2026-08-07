@@ -384,9 +384,9 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Top unified bar (Back button, Undo/Redo, Tool Mode capsule, Animation Transport, and More menu).
           Positioned(
-            top: 8,
-            left: 8 + pad.left,
-            right: 8 + pad.right,
+            top: 4,
+            left: 4 + pad.left,
+            right: 4 + pad.right,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -546,8 +546,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Left sidebar.
           Positioned(
-            top: 56,
-            left: 8 + pad.left,
+            top: 48,
+            left: 4 + pad.left,
             child: OverlayCapsule(
               padding: const EdgeInsets.all(4),
               child: Column(
@@ -646,8 +646,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Right sidebar.
           Positioned(
-            top: 56,
-            right: 8 + pad.right,
+            top: 48,
+            right: 4 + pad.right,
             child: OverlayCapsule(
               padding: const EdgeInsets.all(4),
               child: Column(
@@ -695,8 +695,8 @@ class _EditorScreenState extends State<EditorScreen> {
           // Zoom menu dropdown.
           if (_showMenu)
             Positioned(
-              top: 56,
-              right: 8 + pad.right,
+              top: 48,
+              right: 4 + pad.right,
               child: EditorPanel(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
