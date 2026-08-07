@@ -564,6 +564,20 @@ class _FigureCanvasState extends State<FigureCanvas> {
         fig.points[idx].y = ry + math.sin(d.initAngles[i]) * d.initDists[i] * factor;
       }
       _scaleCurveControls(fig, d, factor);
+
+      d.initSegs.forEach((segId, initVal) {
+        final seg = fig.getSegment(segId);
+        if (seg != null) {
+          seg.width = initVal.width * factor;
+          if (seg.imageWidth is num) {
+            seg.imageWidth = initVal.imageWidth * factor;
+          }
+          if (seg.imageHeight is num) {
+            seg.imageHeight = initVal.imageHeight * factor;
+          }
+        }
+      });
+
       widget.controller.forceUpdate();
     }
 
@@ -722,7 +736,10 @@ class _FigureCanvasState extends State<FigureCanvas> {
     _lastPt = null;
     if (wasCreating) widget.controller.pushHistory();
     if (wasAsset) widget.controller.pushHistory();
-    if (wasDragging) widget.controller.forceUpdate();
+    if (wasDragging) {
+      widget.controller.pushHistory();
+      widget.controller.forceUpdate();
+    }
   }
   @override
   Widget build(BuildContext context) {

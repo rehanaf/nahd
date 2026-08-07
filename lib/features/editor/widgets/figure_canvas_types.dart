@@ -46,6 +46,7 @@ class _DragState {
   bool jointDone = false;
   final Map<String, Point2> anchorImgCenter = {};
   final Map<String, double> anchorImgRot = {};
+  final Map<String, _SegInitial> initSegs = {};
 
   void reset() {
     active = false;
@@ -75,6 +76,7 @@ class _DragState {
     startDist = 0;
     anchorImgCenter.clear();
     anchorImgRot.clear();
+    initSegs.clear();
   }
 }
 
@@ -83,4 +85,15 @@ class _Ctrl {
   double dx;
   double dy;
   _Ctrl(this.dx, this.dy);
+}
+
+class _SegInitial {
+  double width;
+  double imageWidth;
+  double imageHeight;
+  _SegInitial({
+    required this.width,
+    required this.imageWidth,
+    required this.imageHeight,
+  });
 }

@@ -40,9 +40,25 @@ extension _TransformTools on _FigureCanvasState {
       final startDist =
           math.sqrt((w.dx - rx) * (w.dx - rx) + (w.dy - ry) * (w.dy - ry));
       final origCtrl = <String, _Ctrl>{};
+      final origSegs = <String, _SegInitial>{};
       for (final s in fig.segments) {
         if (s.curved && s.controlDX != null && s.controlDY != null) {
           origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+        }
+        if (comp.contains(s.point1Index) && comp.contains(s.point2Index)) {
+          double iw = 100.0;
+          if (s.imageWidth is num) {
+            iw = (s.imageWidth as num).toDouble();
+          }
+          double ih = 100.0;
+          if (s.imageHeight is num) {
+            ih = (s.imageHeight as num).toDouble();
+          }
+          origSegs[s.id] = _SegInitial(
+            width: s.width,
+            imageWidth: iw,
+            imageHeight: ih,
+          );
         }
       }
       _captureAnchorForPoint(fig, root, all: true);
@@ -57,6 +73,7 @@ extension _TransformTools on _FigureCanvasState {
         ..initDists = dists
         ..startDist = startDist > 0.001 ? startDist : 1
         ..fkCtrl = origCtrl
+        ..initSegs.addAll(origSegs)
         ..startX = w.dx
         ..startY = w.dy;
       widget.controller.forceUpdate();
