@@ -1,4 +1,4 @@
-﻿part of 'figure_canvas.dart';
+part of 'figure_canvas.dart';
 
 // ===========================================================================
 // Painter (extracted from figure_canvas.dart)
@@ -484,8 +484,18 @@ class FigureCanvasPainter extends CustomPainter {
           ..strokeCap = _capFor(seg.lineCap);
         _drawSegmentLine(canvas, paint, seg, p1, p2);
       } else if (seg.type == 'circle') {
-        final mx = (p1.x + p2.x) / 2;
-        final my = (p1.y + p2.y) / 2;
+        double mx = (p1.x + p2.x) / 2;
+        double my = (p1.y + p2.y) / 2;
+        if (seg.curved) {
+          final cpx = seg.controlDX != null
+              ? mx + seg.controlDX!
+              : mx + (-(p2.y - p1.y) * seg.curvature);
+          final cpy = seg.controlDY != null
+              ? my + seg.controlDY!
+              : my + ((p2.x - p1.x) * seg.curvature);
+          mx = (p1.x + p2.x) / 4 + cpx / 2;
+          my = (p1.y + p2.y) / 4 + cpy / 2;
+        }
         final r = math.max(
           math.sqrt((p2.x - p1.x) * (p2.x - p1.x) +
                   (p2.y - p1.y) * (p2.y - p1.y)) /
@@ -537,8 +547,18 @@ class FigureCanvasPainter extends CustomPainter {
   void _paintImageSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2) {
     final image = imageFor(seg.imageData);
     if (image == null) return;
-    final mx = (p1.x + p2.x) / 2;
-    final my = (p1.y + p2.y) / 2;
+    double mx = (p1.x + p2.x) / 2;
+    double my = (p1.y + p2.y) / 2;
+    if (seg.curved) {
+      final cpx = seg.controlDX != null
+          ? mx + seg.controlDX!
+          : mx + (-(p2.y - p1.y) * seg.curvature);
+      final cpy = seg.controlDY != null
+          ? my + seg.controlDY!
+          : my + ((p2.x - p1.x) * seg.curvature);
+      mx = (p1.x + p2.x) / 4 + cpx / 2;
+      my = (p1.y + p2.y) / 4 + cpy / 2;
+    }
     final ox = seg.imageOffsetX;
     final oy = seg.imageOffsetY;
     final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);

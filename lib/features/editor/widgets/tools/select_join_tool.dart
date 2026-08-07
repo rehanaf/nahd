@@ -22,7 +22,10 @@ extension _SelectJoinTool on _FigureCanvasState {
       }
     }
 
-    if (tool != EditorTool.line && tool != EditorTool.circle) {
+    if (tool != EditorTool.line &&
+        tool != EditorTool.circle &&
+        tool != EditorTool.image &&
+        tool != EditorTool.none) {
       final rootHit = _hitTestPoint(w);
       final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
       if (roots.contains(rootHit)) {

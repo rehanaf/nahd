@@ -2,7 +2,10 @@ part of '../figure_canvas.dart';
 
 extension _DrawTool on _FigureCanvasState {
   void handleDrawStart(Offset w, EditorTool tool, Figure fig) {
-    if (tool == EditorTool.line || tool == EditorTool.circle) {
+    if (tool == EditorTool.line ||
+        tool == EditorTool.circle ||
+        tool == EditorTool.image ||
+        tool == EditorTool.none) {
       final ptHit = _hitTestPoint(w);
       if (ptHit < 0) {
         if (fig.points.isEmpty) {

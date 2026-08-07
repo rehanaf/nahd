@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/color_picker_sheet.dart';
 
 import '../../../core/models/figure.dart';
 import '../../../core/models/segment.dart';
@@ -42,7 +43,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   String _lastModifyKey = 'point';
   String _lastTransformKey = 'moveAll';
-  String _lastSegmentKey = 'line';
+
 
 
   //--------------------------------------------------------------------------
@@ -136,28 +137,9 @@ class _EditorScreenState extends State<EditorScreen> {
         _ => EditorTool.select,
       };
 
-  /// Segment (sidebar) group: new segment / line / circle / join mapping.
-  bool _isSegmentTool(EditorTool t) =>
-      t == EditorTool.line ||
-      t == EditorTool.circle ||
-      t == EditorTool.join;
 
-  String _segmentKey(EditorTool t) {
-    if (_isSegmentTool(t)) {
-      _lastSegmentKey = switch (t) {
-        EditorTool.circle => 'circle',
-        EditorTool.join => 'join',
-        _ => 'line',
-      };
-    }
-    return _lastSegmentKey;
-  }
 
-  EditorTool _segmentTool(String key) => switch (key) {
-        'circle' => EditorTool.circle,
-        'join' => EditorTool.join,
-        _ => EditorTool.line,
-      };
+
 
 
 
@@ -810,28 +792,111 @@ class _EditorScreenState extends State<EditorScreen> {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ToolGroupButton(
-                        subTools: const [
-                          ToolGroupSub(
-                              icon: Icons.edit,
-                              key: 'line',
-                              color: Color(0xFF22C55E)),
-                          ToolGroupSub(
-                              icon: Icons.panorama_fish_eye,
-                              key: 'circle',
-                              color: Color(0xFF22C55E)),
-                        ],
-                        selectedKey: _segmentKey(c.activeTool),
-                        onSelect: (k) {
-                          setState(() => _lastSegmentKey = k);
-                          c.setTool(_segmentTool(k));
+                      Builder(
+                        builder: (btnCtx) {
+                          final activeTool = c.activeTool;
+                          final seg = c.selectedSegmentId != null
+                              ? c.figure.getSegment(c.selectedSegmentId!)
+                              : null;
+                          IconData icon = Icons.edit;
+                          Color iconColor = const Color(0xFF22C55E);
+
+                          if (activeTool == EditorTool.circle) {
+                            icon = Icons.panorama_fish_eye;
+                            if (seg != null && seg.type == 'circle') {
+                              iconColor = parseHexColor(seg.color) ?? const Color(0xFF22C55E);
+                            }
+                          } else if (activeTool == EditorTool.image) {
+                            icon = Icons.image;
+                          } else if (activeTool == EditorTool.none) {
+                            icon = Icons.visibility_off;
+                            iconColor = Colors.grey;
+                          }
+
+                          final isCurrent = activeTool == EditorTool.line ||
+                              activeTool == EditorTool.circle ||
+                              activeTool == EditorTool.image ||
+                              activeTool == EditorTool.none;
+
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Tooltip(
+                                message: activeTool.name.toUpperCase(),
+                                child: EditorIconButton(
+                                  icon: icon,
+                                  color: iconColor,
+                                  active: isCurrent,
+                                  onTap: () async {
+                                    if (activeTool != EditorTool.line &&
+                                        activeTool != EditorTool.circle &&
+                                        activeTool != EditorTool.image &&
+                                        activeTool != EditorTool.none) {
+                                      c.setTool(EditorTool.line);
+                                      return;
+                                    }
+
+                                    if (activeTool == EditorTool.circle &&
+                                        seg != null &&
+                                        seg.type == 'circle') {
+                                      final Color? picked = await showColorPickerSheet(
+                                        btnCtx,
+                                        parseHexColor(seg.color) ?? Colors.black,
+                                      );
+                                      if (picked != null) {
+                                        setState(() {
+                                          seg.color = colorToHex(picked);
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      }
+                                    } else if (activeTool == EditorTool.image) {
+                                      try {
+                                        final result = await FilePicker.pickFiles(
+                                          type: FileType.image,
+                                          withData: true,
+                                        );
+                                        if (result != null && result.files.isNotEmpty) {
+                                          final bytes = result.files.first.bytes;
+                                          if (bytes != null) {
+                                            final ext = result.files.first.extension ?? 'png';
+                                            final b64 = base64Encode(bytes);
+                                            final dataUri = 'data:image/$ext;base64,$b64';
+                                            c.addSegmentWithImage(dataUri);
+                                          }
+                                        }
+                                      } catch (err) {
+                                        debugPrint("Error picking image: $err");
+                                      }
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Tooltip(
+                                message: 'Switch Segment Type',
+                                child: EditorIconButton(
+                                  icon: Icons.loop,
+                                  color: palette.textSecondary,
+                                  onTap: () {
+                                    EditorTool nextTool = EditorTool.line;
+                                    if (activeTool == EditorTool.line) {
+                                      nextTool = EditorTool.circle;
+                                    } else if (activeTool == EditorTool.circle) {
+                                      nextTool = EditorTool.image;
+                                    } else if (activeTool == EditorTool.image) {
+                                      nextTool = EditorTool.none;
+                                    } else {
+                                      nextTool = EditorTool.line;
+                                    }
+                                    c.setTool(nextTool);
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
                         },
-                        active: c.activeTool == EditorTool.line ||
-                            c.activeTool == EditorTool.circle,
-                        onActivate: () {
-                          c.setTool(_segmentTool(_lastSegmentKey));
-                        },
-                        placement: ToolGroupPlacement.right,
                       ),
                       const SizedBox(height: 4),
                       Tooltip(

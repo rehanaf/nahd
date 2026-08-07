@@ -705,6 +705,46 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   selected: parseHexColor(seg.color),
                   onChanged: (c2) => _change(seg, 'color', colorToHex(c2)),
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Curved',
+                          style: TextStyle(
+                              color: palette.textSecondary, fontSize: 13)),
+                    ),
+                    Switch(
+                      value: seg.curved,
+                      onChanged: isAnimating ? null : (v) => _change(seg, 'curved', v),
+                      activeTrackColor: const Color(0xFF3B82F6),
+                    ),
+                  ],
+                ),
+                if (seg.curved) ...[
+                  const SizedBox(height: 8),
+                  label('Curvature'),
+                  TextField(
+                    controller: TextEditingController(
+                      text: seg.curvature.toStringAsFixed(2),
+                    ),
+                    keyboardType: TextInputType.number,
+                    enabled: !isAnimating,
+                    style: TextStyle(color: palette.text, fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: palette.background,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: palette.border),
+                      ),
+                    ),
+                    onChanged: (v) {
+                      final n = double.tryParse(v);
+                      if (n != null) _change(seg, 'curvature', n);
+                    },
+                  ),
+                ],
                 if (seg.type == 'line') ...[
                   const SizedBox(height: 12),
                   label('Line Width'),
@@ -730,46 +770,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   const SizedBox(height: 12),
                   label('Line Cap'),
                   typePicker(['round', 'square', 'butt']),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('Curved',
-                            style: TextStyle(
-                                color: palette.textSecondary, fontSize: 13)),
-                      ),
-                      Switch(
-                        value: seg.curved,
-                        onChanged: isAnimating ? null : (v) => _change(seg, 'curved', v),
-                        activeTrackColor: const Color(0xFF3B82F6),
-                      ),
-                    ],
-                  ),
-                  if (seg.curved) ...[
-                    const SizedBox(height: 8),
-                    label('Curvature'),
-                    TextField(
-                      controller: TextEditingController(
-                        text: seg.curvature.toStringAsFixed(2),
-                      ),
-                      keyboardType: TextInputType.number,
-                      enabled: !isAnimating,
-                      style: TextStyle(color: palette.text, fontSize: 14),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        filled: true,
-                        fillColor: palette.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: palette.border),
-                        ),
-                      ),
-                      onChanged: (v) {
-                        final n = double.tryParse(v);
-                        if (n != null) _change(seg, 'curvature', n);
-                      },
-                    ),
-                  ],
                 ],
                 if (seg.type == 'circle') ...[
                   const SizedBox(height: 12),
