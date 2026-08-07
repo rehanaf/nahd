@@ -778,185 +778,211 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
           ),
 
-          // Left sidebar.
+          // Left sidebar — two capsules side by side.
           Positioned(
             top: 48,
             left: 4 + pad.left,
-            child: OverlayCapsule(
-              padding: const EdgeInsets.all(4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Left column
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Builder(
-                        builder: (btnCtx) {
-                          final activeTool = c.activeTool;
-                          final seg = c.selectedSegmentId != null
-                              ? c.figure.getSegment(c.selectedSegmentId!)
-                              : null;
-                          IconData toolIcon = Icons.edit;
-                          Color toolIconColor = seg != null
-                              ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
-                              : const Color(0xFF22C55E);
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Capsule 1: Drawing tool + selected segment controls
+                OverlayCapsule(
+                  padding: const EdgeInsets.all(4),
+                  child: Builder(
+                    builder: (btnCtx) {
+                      final activeTool = c.activeTool;
+                      final seg = c.selectedSegmentId != null
+                          ? c.figure.getSegment(c.selectedSegmentId!)
+                          : null;
+                      IconData toolIcon = Icons.edit;
+                      Color toolIconColor = seg != null
+                          ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
+                          : const Color(0xFF22C55E);
 
-                          if (activeTool == EditorTool.circle) {
-                            toolIcon = Icons.panorama_fish_eye;
-                          } else if (activeTool == EditorTool.image) {
-                            toolIcon = Icons.image;
-                          } else if (activeTool == EditorTool.none) {
-                            toolIcon = Icons.visibility_off;
-                            if (seg == null) toolIconColor = Colors.grey;
-                          }
+                      if (activeTool == EditorTool.circle) {
+                        toolIcon = Icons.panorama_fish_eye;
+                      } else if (activeTool == EditorTool.image) {
+                        toolIcon = Icons.image;
+                      } else if (activeTool == EditorTool.none) {
+                        toolIcon = Icons.visibility_off;
+                        if (seg == null) toolIconColor = Colors.grey;
+                      }
 
-                          final isDrawingTool = activeTool == EditorTool.line ||
-                              activeTool == EditorTool.circle ||
-                              activeTool == EditorTool.image ||
-                              activeTool == EditorTool.none;
+                      final isDrawingTool = activeTool == EditorTool.line ||
+                          activeTool == EditorTool.circle ||
+                          activeTool == EditorTool.image ||
+                          activeTool == EditorTool.none;
 
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Tombol 1: Switch Drawing Tool
-                              Tooltip(
-                                message: 'Switch Tool: ${activeTool.name.toUpperCase()}',
-                                child: EditorIconButton(
-                                  icon: toolIcon,
-                                  color: toolIconColor,
-                                  active: isDrawingTool,
-                                  onTap: () {
-                                    EditorTool nextTool = EditorTool.line;
-                                    if (activeTool == EditorTool.line) {
-                                      nextTool = EditorTool.circle;
-                                    } else if (activeTool == EditorTool.circle) {
-                                      nextTool = EditorTool.image;
-                                    } else if (activeTool == EditorTool.image) {
-                                      nextTool = EditorTool.none;
-                                    } else {
-                                      nextTool = EditorTool.line;
-                                    }
-                                    c.setTool(nextTool);
-                                    setState(() {});
-                                  },
-                                ),
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Tombol 1: Switch Drawing Tool
+                          Tooltip(
+                            message: 'Switch Tool: ${activeTool.name.toUpperCase()}',
+                            child: EditorIconButton(
+                              icon: toolIcon,
+                              color: toolIconColor,
+                              active: isDrawingTool,
+                              onTap: () {
+                                EditorTool nextTool = EditorTool.line;
+                                if (activeTool == EditorTool.line) {
+                                  nextTool = EditorTool.circle;
+                                } else if (activeTool == EditorTool.circle) {
+                                  nextTool = EditorTool.image;
+                                } else if (activeTool == EditorTool.image) {
+                                  nextTool = EditorTool.none;
+                                } else {
+                                  nextTool = EditorTool.line;
+                                }
+                                c.setTool(nextTool);
+                                setState(() {});
+                              },
+                            ),
+                          ),
+                          // Tombol 2: Switch Selected Segment Type
+                          if (seg != null) ...[
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Switch Selected Type (${seg.type})',
+                              child: EditorIconButton(
+                                icon: Icons.loop,
+                                color: const Color(0xFF3B82F6),
+                                onTap: () {
+                                  final oldType = seg.type;
+                                  String nextType = 'line';
+                                  if (oldType == 'line') {
+                                    nextType = 'circle';
+                                  } else if (oldType == 'circle') {
+                                    nextType = 'image';
+                                  } else if (oldType == 'image') {
+                                    nextType = 'none';
+                                  } else {
+                                    nextType = 'line';
+                                  }
+                                  setState(() {
+                                    seg.type = nextType;
+                                    seg.filled = nextType != 'circle' && nextType != 'none';
+                                  });
+                                  c.forceUpdate();
+                                  c.pushHistory();
+                                },
                               ),
-                              // Tombol 2: Switch Selected Segment Type (hanya jika ada segment terpilih)
-                              if (seg != null) ...[
-                                const SizedBox(height: 4),
-                                Tooltip(
-                                  message: 'Switch Selected Type (${seg.type})',
-                                  child: EditorIconButton(
-                                    icon: Icons.loop,
-                                    color: const Color(0xFF3B82F6),
-                                    onTap: () {
-                                      final oldType = seg.type;
-                                      String nextType = 'line';
-                                      if (oldType == 'line') {
-                                        nextType = 'circle';
-                                      } else if (oldType == 'circle') {
-                                        nextType = 'image';
-                                      } else if (oldType == 'image') {
-                                        nextType = 'none';
-                                      } else {
-                                        nextType = 'line';
-                                      }
+                            ),
+                            const SizedBox(height: 4),
+                            // Tombol 3: Stroke Color
+                            Tooltip(
+                              message: 'Segment Stroke Color',
+                              child: EditorIconButton(
+                                icon: Icons.circle,
+                                color: parseHexColor(seg.color) ?? const Color(0xFF22C55E),
+                                onTap: () async {
+                                  final Color? picked = await showColorPickerSheet(
+                                    btnCtx,
+                                    parseHexColor(seg.color) ?? Colors.black,
+                                  );
+                                  if (picked != null) {
+                                    setState(() {
+                                      seg.color = colorToHex(picked);
+                                    });
+                                    c.forceUpdate();
+                                    c.pushHistory();
+                                  }
+                                },
+                              ),
+                            ),
+                            // Tombol 4: Fill Color (Circle Only)
+                            if (seg.type == 'circle') ...[
+                              const SizedBox(height: 4),
+                              Tooltip(
+                                message: 'Segment Fill Color',
+                                child: EditorIconButton(
+                                  icon: Icons.circle,
+                                  color: parseHexColor(seg.fillColor) ?? Colors.white,
+                                  onTap: () async {
+                                    final Color? picked = await showColorPickerSheet(
+                                      btnCtx,
+                                      parseHexColor(seg.fillColor) ?? Colors.white,
+                                    );
+                                    if (picked != null) {
                                       setState(() {
-                                        seg.type = nextType;
-                                        seg.filled = nextType != 'circle' && nextType != 'none';
+                                        seg.fillColor = colorToHex(picked);
+                                        seg.filled = true;
                                       });
                                       c.forceUpdate();
                                       c.pushHistory();
-                                    },
-                                  ),
+                                    }
+                                  },
                                 ),
-                                const SizedBox(height: 4),
-                                // Tombol 3: Dynamic Circle Color Picker untuk segment terpilih (Stroke Color)
-                                Tooltip(
-                                  message: 'Segment Stroke Color',
-                                  child: EditorIconButton(
-                                    icon: Icons.circle,
-                                    color: parseHexColor(seg.color) ?? const Color(0xFF22C55E),
-                                    onTap: () async {
-                                      final Color? picked = await showColorPickerSheet(
-                                        btnCtx,
-                                        parseHexColor(seg.color) ?? Colors.black,
+                              ),
+                            ],
+                            // Tombol 5: Replace Image (Image Only)
+                            if (seg.type == 'image') ...[
+                              const SizedBox(height: 4),
+                              Tooltip(
+                                message: 'Replace Image Source',
+                                child: EditorIconButton(
+                                  icon: Icons.image_search,
+                                  color: const Color(0xFF10B981),
+                                  onTap: () async {
+                                    try {
+                                      final result = await FilePicker.pickFiles(
+                                        type: FileType.image,
+                                        withData: true,
                                       );
-                                      if (picked != null) {
-                                        setState(() {
-                                          seg.color = colorToHex(picked);
-                                        });
-                                        c.forceUpdate();
-                                        c.pushHistory();
-                                      }
-                                    },
-                                  ),
-                                ),
-                                // Tombol 4: Dynamic Circle Color Picker untuk segment terpilih (Fill Color - Circle Only)
-                                if (seg.type == 'circle') ...[
-                                  const SizedBox(height: 4),
-                                  Tooltip(
-                                    message: 'Segment Fill Color',
-                                    child: EditorIconButton(
-                                      icon: Icons.circle,
-                                      color: parseHexColor(seg.fillColor) ?? Colors.white,
-                                      onTap: () async {
-                                        final Color? picked = await showColorPickerSheet(
-                                          btnCtx,
-                                          parseHexColor(seg.fillColor) ?? Colors.white,
-                                        );
-                                        if (picked != null) {
+                                      if (result != null && result.files.isNotEmpty) {
+                                        final bytes = result.files.first.bytes;
+                                        if (bytes != null) {
+                                          final ext = result.files.first.extension ?? 'png';
+                                          final b64 = base64Encode(bytes);
+                                          final dataUri = 'data:image/$ext;base64,$b64';
                                           setState(() {
-                                            seg.fillColor = colorToHex(picked);
-                                            seg.filled = true;
+                                            seg.imageData = dataUri;
                                           });
                                           c.forceUpdate();
                                           c.pushHistory();
                                         }
-                                      },
-                                    ),
-                                  ),
-                                ],
-                                // Tombol 5: Upload/Replace Image untuk segment terpilih (Image Only)
-                                if (seg.type == 'image') ...[
-                                  const SizedBox(height: 4),
-                                  Tooltip(
-                                    message: 'Replace Image Source',
-                                    child: EditorIconButton(
-                                      icon: Icons.image_search,
-                                      color: const Color(0xFF10B981),
-                                      onTap: () async {
-                                        try {
-                                          final result = await FilePicker.pickFiles(
-                                            type: FileType.image,
-                                            withData: true,
-                                          );
-                                          if (result != null && result.files.isNotEmpty) {
-                                            final bytes = result.files.first.bytes;
-                                            if (bytes != null) {
-                                              final ext = result.files.first.extension ?? 'png';
-                                              final b64 = base64Encode(bytes);
-                                              final dataUri = 'data:image/$ext;base64,$b64';
-                                              setState(() {
-                                                seg.imageData = dataUri;
-                                              });
-                                              c.forceUpdate();
-                                              c.pushHistory();
-                                            }
-                                          }
-                                        } catch (err) {
-                                          debugPrint("Error replacing image: $err");
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ],
+                                      }
+                                    } catch (err) {
+                                      debugPrint("Error replacing image: $err");
+                                    }
+                                  },
+                                ),
+                              ),
                             ],
-                          );
-                        },
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // Capsule 2: Flip, Layer, Lock, LineCap
+                OverlayCapsule(
+                  padding: const EdgeInsets.all(4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Point lock mode
+                      if (c.selectedPointIndex != null &&
+                          c.selectedPointIndex! < c.figure.points.length) ...[
+                        EditorIconButton(
+                          icon: c.pointModes[c.selectedPointIndex] == 'static'
+                              ? Icons.lock
+                              : Icons.lock_open,
+                          color: const Color(0xFF2563EB),
+                          active: c.pointModes[c.selectedPointIndex] == 'static',
+                          onTap: () => c.togglePointMode(c.selectedPointIndex!),
+                        ),
+                      ] else ...[
+                        const SizedBox(width: 32, height: 32),
+                      ],
+                      const SizedBox(height: 4),
+                      _LineCapButton(
+                        selectedSeg: canFlip
+                            ? c.figure.getSegment(c.selectedSegmentId!)
+                            : null,
+                        onTap: _cycleLineCap,
                       ),
                       const SizedBox(height: 4),
                       Tooltip(
@@ -973,38 +999,6 @@ class _EditorScreenState extends State<EditorScreen> {
                         disabled: !canFlip,
                         onTap: _layerUp,
                       ),
-                    ],
-                  ),
-                  const SizedBox(width: 4),
-                  // Right column
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Placeholder/Point lock mode
-                      if (c.selectedPointIndex != null &&
-                          c.selectedPointIndex! < c.figure.points.length) ...[
-                        EditorIconButton(
-                          icon: c.pointModes[c.selectedPointIndex] == 'static'
-                              ? Icons.lock
-                              : Icons.lock_open,
-                          color: const Color(0xFF2563EB),
-                          active: c.pointModes[c.selectedPointIndex] == 'static',
-                          onTap: () => c.togglePointMode(c.selectedPointIndex!),
-                        ),
-                      ] else ...[
-                        // Maintain vertical alignment if point mode is hidden
-                        const SizedBox(width: 32, height: 32),
-                      ],
-                      const SizedBox(height: 4),
-                      _LineCapButton(
-                        selectedSeg: canFlip
-                            ? c.figure.getSegment(c.selectedSegmentId!)
-                            : null,
-                        onTap: _cycleLineCap,
-                      ),
-                      const SizedBox(height: 4),
-                      // Maintain vertical alignment for segment / flip spacers
-                      const SizedBox(width: 32, height: 32),
                       const SizedBox(height: 4),
                       EditorIconButton(
                         icon: Icons.keyboard_arrow_down,
@@ -1013,8 +1007,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
 
