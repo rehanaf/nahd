@@ -37,6 +37,11 @@ class _EditorScreenState extends State<EditorScreen> {
   _RightTab? _rightTab;
   bool _showMenu = false;
 
+  String _lastModifyKey = 'point';
+  String _lastTransformKey = 'moveAll';
+  String _lastSegmentKey = 'line';
+  String _lastRigKey = 'rig';
+
   //--------------------------------------------------------------------------
   // Actions
   //--------------------------------------------------------------------------
@@ -86,11 +91,16 @@ class _EditorScreenState extends State<EditorScreen> {
   bool _isModifyTool(EditorTool t) =>
       t == EditorTool.point || t == EditorTool.modify || t == EditorTool.curve;
 
-  String _modifyKey(EditorTool t) => switch (t) {
+  String _modifyKey(EditorTool t) {
+    if (_isModifyTool(t)) {
+      _lastModifyKey = switch (t) {
         EditorTool.modify => 'modify',
         EditorTool.curve => 'curve',
         _ => 'point',
       };
+    }
+    return _lastModifyKey;
+  }
 
   EditorTool _modifyTool(String key) => switch (key) {
         'modify' => EditorTool.modify,
@@ -104,11 +114,16 @@ class _EditorScreenState extends State<EditorScreen> {
       t == EditorTool.rotateAll ||
       t == EditorTool.stretch;
 
-  String _transformKey(EditorTool t) => switch (t) {
+  String _transformKey(EditorTool t) {
+    if (_isTransformTool(t)) {
+      _lastTransformKey = switch (t) {
         EditorTool.rotateAll => 'rotateAll',
         EditorTool.stretch => 'scaleAll',
         _ => 'moveAll',
       };
+    }
+    return _lastTransformKey;
+  }
 
   EditorTool _transformTool(String key) => switch (key) {
         'rotateAll' => EditorTool.rotateAll,
@@ -117,11 +132,21 @@ class _EditorScreenState extends State<EditorScreen> {
       };
 
   /// Segment (sidebar) group: new segment / line / circle / join mapping.
-  String _segmentKey(EditorTool t) => switch (t) {
+  bool _isSegmentTool(EditorTool t) =>
+      t == EditorTool.line ||
+      t == EditorTool.circle ||
+      t == EditorTool.join;
+
+  String _segmentKey(EditorTool t) {
+    if (_isSegmentTool(t)) {
+      _lastSegmentKey = switch (t) {
         EditorTool.circle => 'circle',
         EditorTool.join => 'join',
         _ => 'line',
       };
+    }
+    return _lastSegmentKey;
+  }
 
   EditorTool _segmentTool(String key) => switch (key) {
         'circle' => EditorTool.circle,
@@ -130,11 +155,14 @@ class _EditorScreenState extends State<EditorScreen> {
       };
 
   /// Scene mode group (rig / asset / anchor) mapping.
-  String _rigKey(RigMode m) => switch (m) {
-        RigMode.asset => 'asset',
-        RigMode.anchor => 'anchor',
-        _ => 'rig',
-      };
+  String _rigKey(RigMode m) {
+    _lastRigKey = switch (m) {
+      RigMode.asset => 'asset',
+      RigMode.anchor => 'anchor',
+      _ => 'rig',
+    };
+    return _lastRigKey;
+  }
 
   RigMode _rigMode(String key) => switch (key) {
         'asset' => RigMode.asset,
@@ -438,9 +466,12 @@ class _EditorScreenState extends State<EditorScreen> {
                             color: Color(0xFFEC4899)),
                       ],
                       selectedKey: _modifyKey(c.activeTool),
-                      onSelect: (k) => c.setTool(_modifyTool(k)),
+                      onSelect: (k) {
+                        setState(() => _lastModifyKey = k);
+                        c.setTool(_modifyTool(k));
+                      },
                       active: _isModifyTool(c.activeTool),
-                      onActivate: () => c.setTool(EditorTool.point),
+                      onActivate: () => c.setTool(_modifyTool(_lastModifyKey)),
                       placement: ToolGroupPlacement.bottom,
                     ),
                     // Transform group (Move All, Rotate All, Scale All).
@@ -460,9 +491,12 @@ class _EditorScreenState extends State<EditorScreen> {
                             color: Color(0xFFF97316)),
                       ],
                       selectedKey: _transformKey(c.activeTool),
-                      onSelect: (k) => c.setTool(_transformTool(k)),
+                      onSelect: (k) {
+                        setState(() => _lastTransformKey = k);
+                        c.setTool(_transformTool(k));
+                      },
                       active: _isTransformTool(c.activeTool),
-                      onActivate: () => c.setTool(EditorTool.select),
+                      onActivate: () => c.setTool(_transformTool(_lastTransformKey)),
                       placement: ToolGroupPlacement.bottom,
                     ),
                     // Scene mode group (independent from the active tool):
@@ -532,6 +566,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     ],
                     selectedKey: _segmentKey(c.activeTool),
                     onSelect: (k) {
+                      setState(() => _lastSegmentKey = k);
                       if (k == 'newSegment') {
                         _openNewSegment();
                       } else {
@@ -540,8 +575,15 @@ class _EditorScreenState extends State<EditorScreen> {
                     },
                     active: c.activeTool == EditorTool.line ||
                         c.activeTool == EditorTool.circle ||
-                        c.activeTool == EditorTool.join,
-                    onActivate: () => c.setTool(EditorTool.line),
+                        c.activeTool == EditorTool.join ||
+                        _lastSegmentKey == 'newSegment',
+                    onActivate: () {
+                      if (_lastSegmentKey == 'newSegment') {
+                        _openNewSegment();
+                      } else {
+                        c.setTool(_segmentTool(_lastSegmentKey));
+                      }
+                    },
                     placement: ToolGroupPlacement.right,
                   ),
                   const Divider(height: 8),
