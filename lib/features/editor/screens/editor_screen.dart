@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math' as math;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/figure.dart';
@@ -141,15 +144,12 @@ class _EditorScreenState extends State<EditorScreen> {
 
   String _segmentKey(EditorTool t) {
     if (_isSegmentTool(t)) {
-      if (_lastSegmentKey != 'newSegment' || t != _segmentTool(_lastSegmentKey)) {
-        _lastSegmentKey = switch (t) {
-          EditorTool.circle => 'circle',
-          EditorTool.join => 'join',
-          _ => 'line',
-        };
-      }
+      _lastSegmentKey = switch (t) {
+        EditorTool.circle => 'circle',
+        EditorTool.join => 'join',
+        _ => 'line',
+      };
     }
-    print("Mapper _segmentKey activeTool: $t, returning $_lastSegmentKey");
     return _lastSegmentKey;
   }
 
@@ -183,30 +183,7 @@ class _EditorScreenState extends State<EditorScreen> {
     c.forceUpdate();
   }
 
-  Future<void> _openAddFigure() async {
-    final list = await ProjectStorage.listProjects(ProjectType.figure);
-    final filtered = list.where((p) => p.id != widget.controller.projectId).toList();
-    if (!mounted) return;
-    final meta = await showModalBottomSheet<ProjectMeta>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => _AddFigureSheet(projects: filtered),
-    );
-    if (meta != null) _handleAddFigure(meta);
-  }
 
-  Future<void> _openNewSegment() async {
-    final c = widget.controller;
-    final type = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetContext) => _NewSegmentSheet(),
-    );
-    if (type == null || !mounted) return;
-    c.addSegment(type);
-  }
 
   Future<void> _handleAddFigure(ProjectMeta meta) async {
     final c = widget.controller;
@@ -290,6 +267,225 @@ class _EditorScreenState extends State<EditorScreen> {
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
+  Future<void> _pickAndAddImageSegment(EditorController c) async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+      String ext = result.files.first.extension ?? 'png';
+      if (ext == 'jpg') ext = 'jpeg';
+      final base64Str = 'data:image/$ext;base64,${base64Encode(bytes)}';
+      c.addSegmentWithImage(base64Str);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal memilih gambar')),
+        );
+      }
+    }
+  }
+
+  Widget _buildLeftDrawer(EditorController c, AppPalette palette) {
+    return Drawer(
+      width: 300,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(16)),
+      ),
+      backgroundColor: palette.backgroundElement,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            color: Colors.black26,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "ADD ASSET / SEGMENT",
+                    style: TextStyle(
+                      color: palette.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  color: palette.textSecondary,
+                  onPressed: () => Navigator.of(context).pop(),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              "ADD SEGMENT",
+              style: TextStyle(
+                color: palette.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _drawerSegmentIcon(
+                  icon: Icons.edit,
+                  label: 'Line',
+                  color: const Color(0xFF22C55E),
+                  onTap: () {
+                    c.addSegment('line');
+                    Navigator.of(context).pop();
+                  },
+                  palette: palette,
+                ),
+                _drawerSegmentIcon(
+                  icon: Icons.panorama_fish_eye,
+                  label: 'Circle',
+                  color: const Color(0xFF3B82F6),
+                  onTap: () {
+                    c.addSegment('circle');
+                    Navigator.of(context).pop();
+                  },
+                  palette: palette,
+                ),
+                _drawerSegmentIcon(
+                  icon: Icons.join_inner,
+                  label: 'Join',
+                  color: const Color(0xFFF97316),
+                  onTap: () {
+                    c.addSegment('join');
+                    Navigator.of(context).pop();
+                  },
+                  palette: palette,
+                ),
+                _drawerSegmentIcon(
+                  icon: Icons.image,
+                  label: 'Image',
+                  color: const Color(0xFFEC4899),
+                  onTap: () => _pickAndAddImageSegment(c),
+                  palette: palette,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 24, indent: 12, endIndent: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              "ADD FIGURE ASSET",
+              style: TextStyle(
+                color: palette.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<ProjectMeta>>(
+              future: ProjectStorage.listProjects(ProjectType.figure),
+              builder: (ctx, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final list = snapshot.data ?? [];
+                final filtered = list.where((p) => p.id != c.projectId).toList();
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        "No other figures found",
+                        style: TextStyle(color: palette.textSecondary, fontSize: 12),
+                      ),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, idx) {
+                    final meta = filtered[idx];
+                    return Card(
+                      color: palette.background,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(color: palette.border, width: 0.5),
+                      ),
+                      child: ListTile(
+                        dense: true,
+                        title: Text(
+                          meta.name,
+                          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "ID: ${meta.id.substring(0, math.min(8, meta.id.length))}...",
+                          style: TextStyle(color: palette.textSecondary),
+                        ),
+                        trailing: Icon(Icons.add, color: palette.text, size: 16),
+                        onTap: () {
+                          _handleAddFigure(meta);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _drawerSegmentIcon({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    required AppPalette palette,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OverlayCapsule(
+          padding: const EdgeInsets.all(4),
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(18),
+              child: Icon(icon, size: 20, color: color),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(color: palette.textSecondary, fontSize: 9),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDrawer(EditorController c, AppPalette palette) {
     final tab = _rightTab ?? _RightTab.inspector;
     return Drawer(
@@ -359,6 +555,7 @@ class _EditorScreenState extends State<EditorScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: palette.background,
+      drawer: _buildLeftDrawer(c, palette),
       endDrawer: _buildDrawer(c, palette),
       onEndDrawerChanged: (opened) {
         if (!opened && _rightTab != null) {
@@ -551,15 +748,11 @@ class _EditorScreenState extends State<EditorScreen> {
                       EditorIconButton(
                         icon: Icons.create_new_folder,
                         color: const Color(0xFF22C55E),
-                        onTap: _openAddFigure,
+                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       ),
                       const SizedBox(height: 4),
                       ToolGroupButton(
                         subTools: const [
-                          ToolGroupSub(
-                              icon: Icons.control_point,
-                              key: 'newSegment',
-                              color: Color(0xFF8B5CF6)),
                           ToolGroupSub(
                               icon: Icons.edit,
                               key: 'line',
@@ -576,22 +769,13 @@ class _EditorScreenState extends State<EditorScreen> {
                         selectedKey: _segmentKey(c.activeTool),
                         onSelect: (k) {
                           setState(() => _lastSegmentKey = k);
-                          if (k == 'newSegment') {
-                            _openNewSegment();
-                          } else {
-                            c.setTool(_segmentTool(k));
-                          }
+                          c.setTool(_segmentTool(k));
                         },
                         active: c.activeTool == EditorTool.line ||
                             c.activeTool == EditorTool.circle ||
-                            c.activeTool == EditorTool.join ||
-                            _lastSegmentKey == 'newSegment',
+                            c.activeTool == EditorTool.join,
                         onActivate: () {
-                          if (_lastSegmentKey == 'newSegment') {
-                            _openNewSegment();
-                          } else {
-                            c.setTool(_segmentTool(_lastSegmentKey));
-                          }
+                          c.setTool(_segmentTool(_lastSegmentKey));
                         },
                         placement: ToolGroupPlacement.right,
                       ),

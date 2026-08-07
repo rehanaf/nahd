@@ -277,6 +277,23 @@ class EditorController extends ChangeNotifier {
     return root;
   }
 
+  int addSegmentWithImage(String imageData) {
+    if (_figure == null) return -1;
+    final seg = _figure!.addSegment('image');
+    seg.imageData = imageData;
+    seg.imageWidth = 100;
+    seg.imageHeight = 'auto';
+    final root = seg.point1Index;
+    if (!_figure!.rootIndices.contains(root)) {
+      _figure!.rootIndices.add(root);
+    }
+    setSelectedSegment(seg.id);
+    setSelectedPoint(seg.point2Index);
+    forceUpdate();
+    pushHistory();
+    return root;
+  }
+
   /// Merges the dragged point into [targetIdx]; the surviving (target) root
   /// is kept and the moved point's root is dropped.
   void joinPoints(int movedIdx, int targetIdx) {
