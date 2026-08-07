@@ -149,7 +149,6 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
   void _handleMainTap() {
     if (!widget.active) {
       widget.onActivate();
-      return;
     }
     if (_entry != null) {
       _close();
@@ -186,12 +185,16 @@ class _ToolGroupButtonState extends State<ToolGroupButton> {
                 : topLeft.dy,
             child: Material(
               type: MaterialType.transparency,
-              child: widget.placement == ToolGroupPlacement.bottom
-                  ? FractionalTranslation(
-                      translation: const Offset(-0.5, 0),
-                      child: _subBar(),
-                    )
-                  : _subBar(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {}, // Blocks taps from reaching the background barrier
+                child: widget.placement == ToolGroupPlacement.bottom
+                    ? FractionalTranslation(
+                        translation: const Offset(-0.5, 0),
+                        child: _subBar(),
+                      )
+                    : _subBar(),
+              ),
             ),
           ),
         ],
