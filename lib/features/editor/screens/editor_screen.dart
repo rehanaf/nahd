@@ -796,6 +796,22 @@ class _EditorScreenState extends State<EditorScreen> {
                         ),
                         const SizedBox(height: 4),
                         Tooltip(
+                          message: 'Attach Figure',
+                          child: EditorIconButton(
+                            icon: Icons.link,
+                            color: const Color(0xFFF59E0B),
+                            active: c.activeTool == EditorTool.attach,
+                            onTap: () {
+                              c.setTool(c.activeTool == EditorTool.attach
+                                  ? EditorTool.rotate
+                                  : EditorTool.attach);
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(height: 1, width: 24, color: palette.border),
+                        const SizedBox(height: 8),
+                        Tooltip(
                           message: 'Center Figure',
                           child: EditorIconButton(
                             icon: Icons.filter_center_focus,

@@ -759,6 +759,36 @@ class _FigureCanvasState extends State<FigureCanvas> {
     d.jointDone = true;
   }
 
+  void _handleAttachMove(Figure fig, _DragState d, Offset w) {
+    final z = widget.controller.camera.zoom;
+    final threshold = 15 / z;
+    final pt = fig.points[d.ptIdx];
+    final draggedComp = fig.connectedComponent(d.ptIdx);
+    
+    // Only allow attaching the ROOT of the figure, or any point?
+    // User: "mirip seperti join tapi drag pivot hanya move, dan yg di drag menjadi attachment untuk titik tujuannya"
+    // Usually it attaches the root. But we'll just use d.ptIdx.
+    
+    for (var i = 0; i < fig.points.length; i++) {
+      if (i == d.ptIdx) continue;
+      // Constraint: "hanya bisa attach jika di figure yg berbeda, tadi tidak bisa attach ke segment lain yg masih 1 root"
+      if (draggedComp.contains(i)) continue;
+      
+      final o = fig.points[i];
+      final dist = math.sqrt(
+          (o.x - pt.x) * (o.x - pt.x) + (o.y - pt.y) * (o.y - pt.y));
+      if (dist < threshold) {
+        // They are close enough, attach!
+        // Joining merges them structurally.
+        widget.controller.joinPoints(d.ptIdx, i);
+        d.jointDone = true;
+        d.active = false;
+        widget.controller.setTool(EditorTool.rotate); // revert tool
+        return;
+      }
+    }
+  }
+
   void _handleTouchEnd() {
     final wasCreating = _drag.creating;
     final wasDragging = _drag.active || _drag.isPan;

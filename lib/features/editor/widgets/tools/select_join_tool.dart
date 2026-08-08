@@ -86,12 +86,19 @@ extension _SelectJoinTool on _FigureCanvasState {
   }
 
   void handleSelectJoinMove(Figure fig, _DragState d, Offset w) {
-    if (widget.controller.activeTool == EditorTool.join &&
+    final isJoin = widget.controller.activeTool == EditorTool.join;
+    final isAttach = widget.controller.activeTool == EditorTool.attach;
+    
+    if ((isJoin || isAttach) &&
         d.isPoint &&
         d.ptIdx >= 0 &&
         d.ptIdx < fig.points.length &&
         !d.jointDone) {
-      _handleJoinMove(fig, d, w);
+      if (isAttach) {
+        _handleAttachMove(fig, d, w);
+      } else {
+        _handleJoinMove(fig, d, w);
+      }
     }
   }
 }

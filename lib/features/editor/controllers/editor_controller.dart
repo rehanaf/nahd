@@ -33,6 +33,7 @@ enum EditorTool {
   asset,
   join,
   anchor,
+  attach,
 }
 
 extension EditorToolX on EditorTool {
@@ -51,6 +52,7 @@ extension EditorToolX on EditorTool {
         EditorTool.asset => 'Asset',
         EditorTool.join => 'Join',
         EditorTool.anchor => 'Anchor',
+        EditorTool.attach => 'Attach',
       };
 }
 
