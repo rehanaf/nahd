@@ -55,6 +55,17 @@ class FigureCanvasPainter extends CustomPainter {
         ..strokeWidth = 1.5,
     );
 
+    if (c.showAxis) {
+      final axisPaint = Paint()
+        ..color = const Color(0x66EF4444) // Semi-transparent red
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / cam.zoom;
+      // Y-axis (x=0)
+      canvas.drawLine(const Offset(0, -9999), const Offset(0, 9999), axisPaint);
+      // X-axis (y=0)
+      canvas.drawLine(const Offset(-9999, 0), const Offset(9999, 0), axisPaint);
+    }
+
     if (c.isAnimateMode) {
       _paintOnion(canvas, size);
     }
@@ -232,8 +243,9 @@ class FigureCanvasPainter extends CustomPainter {
         }
         final p1 = pts[seg.point1Index];
         final p2 = pts[seg.point2Index];
+        final overColor = _colorOverrideAt(fig, seg.point1Index, t);
         final strokeColor =
-            (parseHexColor(seg.color) ?? const Color(0xFFD1D5DB))
+            (parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB))
                 .withValues(alpha: alpha);
         if (seg.type == 'circle') {
           final mx = (p1.x + p2.x) / 2;
@@ -246,7 +258,8 @@ class FigureCanvasPainter extends CustomPainter {
           );
           if (seg.filled) {
             final fillColor =
-                (parseHexColor(seg.fillColor) ??
+                (parseHexColor(overColor) ??
+                        parseHexColor(seg.fillColor) ??
                         parseHexColor(seg.color) ??
                         const Color(0xFFD1D5DB))
                     .withValues(alpha: alpha);
@@ -364,8 +377,8 @@ class FigureCanvasPainter extends CustomPainter {
           }
           final entry = cf[key]!;
           if (entry.filled) {
-            final fillColor =
-                parseHexColor(entry.fillColor) ?? const Color(0xFFD1D5DB);
+            final overColor = _colorOverrideAt(fig, ordered.first, c.currentTime);
+            final fillColor = parseHexColor(overColor) ?? parseHexColor(entry.fillColor) ?? const Color(0xFFD1D5DB);
             final path = _cyclePath(pts);
             canvas.drawPath(path, Paint()..color = fillColor);
           }
@@ -406,7 +419,8 @@ class FigureCanvasPainter extends CustomPainter {
                 }
                 final entry = cf[key]!;
                 if (entry.filled) {
-                  final fillColor = parseHexColor(entry.fillColor) ??
+                  final overColor = _colorOverrideAt(fig, seed, c.currentTime);
+                  final fillColor = parseHexColor(overColor) ?? parseHexColor(entry.fillColor) ??
                       const Color(0xFFD1D5DB);
                   final pts = [...cur.path, seed];
                   final path = _cyclePath(pts);
@@ -478,8 +492,10 @@ class FigureCanvasPainter extends CustomPainter {
 
       final opacity = _opacityAt(fig, seg.point1Index, c.currentTime);
 
+      final overColor = _colorOverrideAt(fig, seg.point1Index, c.currentTime);
+
       if (seg.type == 'line') {
-        final baseColor = parseHexColor(seg.color) ?? const Color(0xFFD1D5DB);
+        final baseColor = parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
         final paint = Paint()
           ..color = baseColor.withOpacity(baseColor.opacity * opacity)
           ..style = PaintingStyle.stroke
@@ -506,16 +522,14 @@ class FigureCanvasPainter extends CustomPainter {
           1.0,
         );
         if (seg.filled) {
-          final baseColor = parseHexColor(seg.fillColor) ??
+          final baseColor = parseHexColor(overColor) ??
+              parseHexColor(seg.fillColor) ??
               parseHexColor(seg.color) ??
               const Color(0xFFD1D5DB);
-          canvas.drawCircle(
-            Offset(mx, my),
-            r,
-            Paint()..color = baseColor.withOpacity(baseColor.opacity * opacity),
-          );
+          final paint = Paint()..color = baseColor.withOpacity(baseColor.opacity * opacity);
+          canvas.drawCircle(Offset(mx, my), r, paint);
         }
-        final strokeColor = parseHexColor(seg.color) ?? const Color(0xFFD1D5DB);
+        final strokeColor = parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
         canvas.drawCircle(
           Offset(mx, my),
           r,
@@ -549,7 +563,15 @@ class FigureCanvasPainter extends CustomPainter {
   }
 
   void _paintImageSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2, double opacity) {
-    final image = imageFor(seg.imageData);
+    int imageIndex = seg.activeImageIndex;
+    if (c.isAnimateMode) {
+      imageIndex = fig.getSegmentImageIndex(seg.id, c.currentTime) ?? imageIndex;
+    }
+    String? imageData = seg.imageDataList.isNotEmpty && imageIndex >= 0 && imageIndex < seg.imageDataList.length
+        ? seg.imageDataList[imageIndex]
+        : null;
+
+    final image = imageFor(imageData);
     if (image == null) return;
     double mx = (p1.x + p2.x) / 2;
     double my = (p1.y + p2.y) / 2;
@@ -680,6 +702,8 @@ class FigureCanvasPainter extends CustomPainter {
       final Color fill;
       if (sel) {
         fill = const Color(0xFFFACC15);
+      } else if (pt.isAttached) {
+        fill = const Color(0xFFF97316); // orange for attached pivot
       } else if (isRoot) {
         fill = const Color(0xFFEF4444);
       } else if (c.pointModes[i] == 'static') {
@@ -761,6 +785,37 @@ class FigureCanvasPainter extends CustomPainter {
       }
     }
     return f.getFigureOpacity(root, t);
+  }
+
+  String? _colorOverrideAt(Figure f, int pointIdx, double t) {
+    if (!c.isAnimateMode) return null;
+    if (pointIdx < 0 || pointIdx >= f.points.length) return null;
+    final roots = f.rootIndices.isNotEmpty ? f.rootIndices : [0];
+    var root = roots.first;
+    outer:
+    for (final r in roots) {
+      final visited = <int>{r};
+      final queue = <int>[r];
+      while (queue.isNotEmpty) {
+        final idx = queue.removeAt(0);
+        if (idx == pointIdx) {
+          root = r;
+          break outer;
+        }
+        for (final s in f.segments) {
+          final other = s.point1Index == idx
+              ? s.point2Index
+              : s.point2Index == idx
+                  ? s.point1Index
+                  : -1;
+          if (other >= 0 && !visited.contains(other)) {
+            visited.add(other);
+            queue.add(other);
+          }
+        }
+      }
+    }
+    return f.getFigureColorOverride(root, t);
   }
 
   @override

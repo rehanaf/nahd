@@ -38,16 +38,18 @@ String colorToHex(Color? color) {
 class Point2 {
   double x;
   double y;
+  bool isAttached;
 
-  Point2([this.x = 0, this.y = 0]);
+  Point2([this.x = 0, this.y = 0, this.isAttached = false]);
 
   Point2.fromJson(Map<String, dynamic> json)
       : x = (json['x'] as num?)?.toDouble() ?? 0,
-        y = (json['y'] as num?)?.toDouble() ?? 0;
+        y = (json['y'] as num?)?.toDouble() ?? 0,
+        isAttached = json['isAttached'] as bool? ?? false;
 
-  Map<String, dynamic> toJson() => {'x': x, 'y': y};
+  Map<String, dynamic> toJson() => {'x': x, 'y': y, 'isAttached': isAttached};
 
-  Point2 clone() => Point2(x, y);
+  Point2 clone() => Point2(x, y, isAttached);
 
   @override
   String toString() => '($x, $y)';
@@ -71,7 +73,8 @@ class Segment {
   bool curved;
   double curvature;
   bool hidden;
-  String? imageData; // base64 data URI
+  List<String> imageDataList;
+  int activeImageIndex;
   dynamic imageObj; // runtime decoded object (unused in Dart)
   dynamic imageWidth; // number or 'auto'
   dynamic imageHeight; // number or 'auto'
@@ -98,7 +101,8 @@ class Segment {
         curved = false,
         curvature = 0.3,
         hidden = false,
-        imageData = null,
+        imageDataList = [],
+        activeImageIndex = 0,
         imageObj = null,
         imageWidth = 100,
         imageHeight = 'auto',
@@ -106,9 +110,25 @@ class Segment {
         imageOffsetY = 0,
         imageRotate = 0,
         shapeClosed = true,
-        filled = type != 'circle' && type != 'none',
+        filled = false,
         controlDX = null,
         controlDY = null;
+
+  String? get imageData {
+    if (imageDataList.isEmpty) return null;
+    if (activeImageIndex < 0 || activeImageIndex >= imageDataList.length) return imageDataList.first;
+    return imageDataList[activeImageIndex];
+  }
+  
+  set imageData(String? data) {
+    if (data == null) {
+      imageDataList.clear();
+      activeImageIndex = 0;
+    } else {
+      imageDataList = [data];
+      activeImageIndex = 0;
+    }
+  }
 
   static String _randomId() {
     _counter++;
@@ -134,7 +154,9 @@ class Segment {
         'curved': curved,
         'curvature': curvature,
         'hidden': hidden,
-        'imageData': imageData,
+        'imageDataList': imageDataList,
+        'activeImageIndex': activeImageIndex,
+        'imageData': imageData, // For backwards compatibility when saving
         'imageWidth': imageWidth,
         'imageHeight': imageHeight,
         'imageOffsetX': imageOffsetX,
@@ -160,7 +182,15 @@ class Segment {
     seg.curved = data['curved'] as bool? ?? false;
     seg.curvature = (data['curvature'] as num?)?.toDouble() ?? 0.3;
     seg.hidden = data['hidden'] as bool? ?? false;
-    seg.imageData = data['imageData'] as String?;
+    
+    if (data['imageDataList'] != null) {
+      seg.imageDataList = List<String>.from(data['imageDataList']);
+      seg.activeImageIndex = (data['activeImageIndex'] as num?)?.toInt() ?? 0;
+    } else if (data['imageData'] != null) {
+      seg.imageDataList = [data['imageData'] as String];
+      seg.activeImageIndex = 0;
+    }
+    
     seg.imageWidth = data['imageWidth'] ?? 100;
     seg.imageHeight = data['imageHeight'] ?? 'auto';
     seg.imageOffsetX = (data['imageOffsetX'] as num?)?.toDouble() ?? 0;

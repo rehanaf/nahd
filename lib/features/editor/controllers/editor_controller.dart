@@ -103,13 +103,30 @@ class EditorController extends ChangeNotifier {
   bool autoEasing = true;
 
   /// Whether to draw connector lines between sub-figures (root points).
-  bool showConnectors = true;
+  bool _showConnectors = true;
+  bool get showConnectors => _showConnectors;
+
+  bool _showAxis = false;
+  bool get showAxis => _showAxis;
+
+  bool _panEnabled = true;
+  bool get panEnabled => _panEnabled;
 
   /// The image segment currently being edited in asset mode (by id).
   String? assetSegmentId;
 
   void toggleConnectors() {
-    showConnectors = !showConnectors;
+    _showConnectors = !_showConnectors;
+    forceUpdate();
+  }
+
+  void toggleAxis() {
+    _showAxis = !_showAxis;
+    forceUpdate();
+  }
+
+  void togglePanEnabled() {
+    _panEnabled = !_panEnabled;
     notifyListeners();
   }
 
@@ -302,8 +319,8 @@ class EditorController extends ChangeNotifier {
 
   /// Merges the dragged point into [targetIdx]; the surviving (target) root
   /// is kept and the moved point's root is dropped.
-  void joinPoints(int movedIdx, int targetIdx) {
-    if (_figure == null) return;
+  int joinPoints(int movedIdx, int targetIdx) {
+    if (_figure == null) return targetIdx;
     final target = _figure!.joinPoints(movedIdx, targetIdx);
     setSelectedPoint(target);
     pointModes.remove(movedIdx);
@@ -325,6 +342,7 @@ class EditorController extends ChangeNotifier {
     }
     forceUpdate();
     pushHistory();
+    return target;
   }
 
   /// Splits the joint point so it detaches from [detachFromIdx], giving the
@@ -594,6 +612,28 @@ class EditorController extends ChangeNotifier {
 
     figure.setFigureOpacity(root, currentTime, val);
     
+    pushHistory();
+    forceUpdate();
+  }
+
+  void setFigureColorOverride(int ptIdx, String color) {
+    if (_figure == null) return;
+    final comp = figure.connectedComponent(ptIdx);
+    final root = figure.rootIndices.firstWhere(
+      (r) => comp.contains(r),
+      orElse: () => -1,
+    );
+    if (root == -1) return;
+
+    figure.setFigureColorOverride(root, currentTime, color);
+    
+    pushHistory();
+    forceUpdate();
+  }
+
+  void setSegmentImageIndex(String segId, int imageIndex) {
+    if (_figure == null) return;
+    figure.setSegmentImageIndex(segId, currentTime, imageIndex);
     pushHistory();
     forceUpdate();
   }

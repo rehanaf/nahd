@@ -164,16 +164,8 @@ class _EditorScreenState extends State<EditorScreen> {
       if (src.points.isEmpty) return;
 
       final srcPts = src.points;
-      final xs = srcPts.map((p) => p.x).toList();
-      final ys = srcPts.map((p) => p.y).toList();
-      final minX = xs.reduce((a, b) => a < b ? a : b);
-      final minY = ys.reduce((a, b) => a < b ? a : b);
-      final maxY = ys.reduce((a, b) => a > b ? a : b);
-      final curMaxX = c.figure.points.isEmpty
-          ? -100
-          : c.figure.points.map((p) => p.x).reduce((a, b) => a > b ? a : b);
-      final offsetX = curMaxX + 100 - minX;
-      final offsetY = -((minY + maxY) / 2);
+      final offsetX = 0.0;
+      final offsetY = 0.0;
 
       final indexMap = <int, int>{};
       final base = c.figure.points.length;
@@ -628,10 +620,21 @@ class _EditorScreenState extends State<EditorScreen> {
                     const SizedBox(width: 4),
                     OverlayCapsule(
                       padding: const EdgeInsets.all(4),
-                      child: EditorIconButton(
-                        icon: Icons.create_new_folder,
-                        color: const Color(0xFF22C55E),
-                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      child: Row(
+                        children: [
+                          EditorIconButton(
+                            icon: Icons.create_new_folder,
+                            color: const Color(0xFF22C55E),
+                            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                          ),
+                          const SizedBox(width: 4),
+                          EditorIconButton(
+                            icon: Icons.pan_tool,
+                            color: const Color(0xFF8B5CF6),
+                            active: c.panEnabled,
+                            onTap: c.togglePanEnabled,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1410,8 +1413,20 @@ class _EditorScreenState extends State<EditorScreen> {
                           ? 'Hide Connectors'
                           : 'Show Connectors',
                       onTap: () {
-                        c.toggleConnectors();
                         setState(() => _showMenu = false);
+                        widget.controller.toggleConnectors();
+                      },
+                    ),
+                    _MenuItem(
+                      icon: c.showAxis
+                          ? Icons.grid_off
+                          : Icons.grid_on,
+                      label: c.showAxis
+                          ? 'Hide Grid Axis'
+                          : 'Show Grid Axis',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        widget.controller.toggleAxis();
                       },
                     ),
                     _MenuItem(

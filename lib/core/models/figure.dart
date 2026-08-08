@@ -56,6 +56,40 @@ class OpacityKeyframe {
   OpacityKeyframe clone() => OpacityKeyframe(time, opacity);
 }
 
+class FigureColorKeyframe {
+  double time;
+  String color;
+
+  FigureColorKeyframe(this.time, this.color);
+
+  Map<String, dynamic> toJson() => {'time': time, 'color': color};
+
+  factory FigureColorKeyframe.fromJson(Map<String, dynamic> json) =>
+      FigureColorKeyframe(
+        (json['time'] as num?)?.toDouble() ?? 0,
+        json['color'] as String? ?? '#000000',
+      );
+
+  FigureColorKeyframe clone() => FigureColorKeyframe(time, color);
+}
+
+class SegmentImageKeyframe {
+  double time;
+  int imageIndex;
+
+  SegmentImageKeyframe(this.time, this.imageIndex);
+
+  Map<String, dynamic> toJson() => {'time': time, 'imageIndex': imageIndex};
+
+  factory SegmentImageKeyframe.fromJson(Map<String, dynamic> json) =>
+      SegmentImageKeyframe(
+        (json['time'] as num?)?.toDouble() ?? 0,
+        (json['imageIndex'] as num?)?.toInt() ?? 0,
+      );
+
+  SegmentImageKeyframe clone() => SegmentImageKeyframe(time, imageIndex);
+}
+
 /// A structural layer group (folder) that owns a set of segments. Segments
 /// not listed in any group belong to the implicit default group.
 class LayerGroup {
@@ -125,6 +159,8 @@ class Figure {
   List<int> rootIndices;
   Map<String, List<VisibilityKeyframe>> visibility;
   Map<String, List<OpacityKeyframe>> opacity;
+  Map<String, List<FigureColorKeyframe>> colors;
+  Map<String, List<SegmentImageKeyframe>> segmentImages;
   List<LayerGroup> groups;
 
   static const String defaultGroupId = 'layer_default';
@@ -141,6 +177,8 @@ class Figure {
         rootIndices = [],
         visibility = {},
         opacity = {},
+        colors = {},
+        segmentImages = {},
         groups = [LayerGroup(id: defaultGroupId, name: 'Default')];
 
   int addPoint(double x, double y) {
@@ -168,10 +206,7 @@ class Figure {
   }
 
   Segment addSegment([String type = 'line']) {
-    final maxX = points.isEmpty
-        ? 0.0
-        : points.map((p) => p.x).reduce((a, b) => a > b ? a : b);
-    final baseX = maxX + 60;
+    final baseX = 0.0;
     final p1 = addPoint(baseX, 0);
     final p2 = addPoint(baseX + 30, 0);
     return createSegment(type, p1, p2);
@@ -325,6 +360,66 @@ class Figure {
 
   List<OpacityKeyframe> getFigureOpacityKeyframes(int root) =>
       opacity[root.toString()] ?? [];
+
+  void setFigureColorOverride(int root, double time, String color) {
+    final key = root.toString();
+    final track = colors.putIfAbsent(key, () => []);
+    final existing = track.where((kf) => (kf.time - time).abs() < 0.001).toList();
+    if (existing.isNotEmpty) {
+      existing.first.color = color;
+    } else {
+      track.add(FigureColorKeyframe(time, color));
+      track.sort((a, b) => a.time.compareTo(b.time));
+    }
+  }
+
+  String? getFigureColorOverride(int root, double time) {
+    final track = colors[root.toString()];
+    if (track == null || track.isEmpty) return null;
+    var val = track.first.color;
+    bool found = false;
+    for (final kf in track) {
+      if (kf.time <= time + 0.0001) {
+        val = kf.color;
+        found = true;
+      }
+    }
+    return found ? val : null;
+  }
+
+  void removeFigureColorOverride(int root, double time) {
+    final key = root.toString();
+    final track = colors[key];
+    if (track != null) {
+      track.removeWhere((kf) => (kf.time - time).abs() < 0.001);
+      if (track.isEmpty) colors.remove(key);
+    }
+  }
+
+  void setSegmentImageIndex(String segId, double time, int imageIndex) {
+    final track = segmentImages.putIfAbsent(segId, () => []);
+    final existing = track.where((kf) => (kf.time - time).abs() < 0.001).toList();
+    if (existing.isNotEmpty) {
+      existing.first.imageIndex = imageIndex;
+    } else {
+      track.add(SegmentImageKeyframe(time, imageIndex));
+      track.sort((a, b) => a.time.compareTo(b.time));
+    }
+  }
+
+  int? getSegmentImageIndex(String segId, double time) {
+    final track = segmentImages[segId];
+    if (track == null || track.isEmpty) return null;
+    var val = track.first.imageIndex;
+    bool found = false;
+    for (final kf in track) {
+      if (kf.time <= time + 0.0001) {
+        val = kf.imageIndex;
+        found = true;
+      }
+    }
+    return found ? val : null;
+  }
 
   /// Returns the connected set of point indices containing [rootIndex].
   Set<int> connectedComponent(int rootIndex) {
@@ -639,6 +734,10 @@ class Figure {
             (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
         'opacity': opacity.map(
             (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
+        'colors': colors.map(
+            (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
+        'segmentImages': segmentImages.map(
+            (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
         'groups': groups.map((g) => g.toJson()).toList(),
       };
 
@@ -729,6 +828,30 @@ class Figure {
           fig.opacity[k.toString()] = v
               .whereType<Map>()
               .map((e) => OpacityKeyframe.fromJson(e.cast<String, dynamic>()))
+              .toList();
+        }
+      });
+    }
+
+    final rawColors = data['colors'];
+    if (rawColors is Map) {
+      rawColors.forEach((k, v) {
+        if (v is List) {
+          fig.colors[k.toString()] = v
+              .whereType<Map>()
+              .map((e) => FigureColorKeyframe.fromJson(e.cast<String, dynamic>()))
+              .toList();
+        }
+      });
+    }
+
+    final rawSegImgs = data['segmentImages'];
+    if (rawSegImgs is Map) {
+      rawSegImgs.forEach((k, v) {
+        if (v is List) {
+          fig.segmentImages[k.toString()] = v
+              .whereType<Map>()
+              .map((e) => SegmentImageKeyframe.fromJson(e.cast<String, dynamic>()))
               .toList();
         }
       });
