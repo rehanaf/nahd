@@ -609,6 +609,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       final ref = item.groupRef!;
       final members = _projects.where((p) => p.groupId == ref.id).toList();
       return _GroupCardTile(
+        key: ValueKey(ref.key),
         palette: palette,
         label: ref.label,
         count: members.length,
@@ -619,6 +620,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
     final meta = item.meta!;
     return _ProjectCardTile(
+      key: ValueKey(meta.id),
       palette: palette,
       meta: meta,
       onOpen: () => widget.onOpenProject(meta.id, meta.type),
@@ -709,6 +711,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   palette,
                   projects.length,
                   (i) => _ProjectCardTile(
+                    key: ValueKey(projects[i].id),
                     palette: palette,
                     meta: projects[i],
                     onOpen: () => widget

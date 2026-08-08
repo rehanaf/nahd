@@ -10,6 +10,7 @@ class _ProjectCardTile extends StatefulWidget {
   final VoidCallback onMenu;
 
   const _ProjectCardTile({
+    super.key,
     required this.palette,
     required this.meta,
     required this.onOpen,
@@ -123,6 +124,7 @@ class _GroupCardTile extends StatefulWidget {
   final VoidCallback? onMenu;
 
   const _GroupCardTile({
+    super.key,
     required this.palette,
     required this.label,
     required this.count,
@@ -144,7 +146,18 @@ class _GroupCardTileState extends State<_GroupCardTile> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(_GroupCardTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.members.length != widget.members.length ||
+        !identical(oldWidget.members, widget.members)) {
+      _previews.clear();
+      _load();
+    }
+  }
+
   Future<void> _load() async {
+    _previews.clear();
     final metas = widget.members.take(4).toList();
     for (final m in metas) {
       try {
