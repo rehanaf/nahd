@@ -56,7 +56,9 @@ class ProjectZipManifest {
       version: (json['version'] as num?)?.toInt() ?? 0,
       type: json['type'] == 'animation'
           ? ProjectType.animation
-          : ProjectType.figure,
+          : json['type'] == 'preset'
+              ? ProjectType.preset
+              : ProjectType.figure,
       name: json['name'] as String? ?? '',
       groupId: json['groupId'] as String?,
       predef: json['predef'] as bool?,

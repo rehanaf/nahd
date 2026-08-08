@@ -4,6 +4,7 @@ import '../project_storage.dart';
 ///
 /// - figure/default/Stickman
 /// - animation/default/Bounce Ball
+/// - preset/default/Runner
 class PredefinedProjects {
   PredefinedProjects._();
 
@@ -86,6 +87,40 @@ class PredefinedProjects {
 }
 ''';
 
+  static const String runnerFigureJson = '''
+{
+  "name": "Runner",
+  "points": [
+    { "x": 0, "y": -72 },
+    { "x": 0, "y": -54 },
+    { "x": 0, "y": -12 },
+    { "x": -18, "y": -40 },
+    { "x": 22, "y": -32 },
+    { "x": 22, "y": 28 },
+    { "x": -20, "y": 34 },
+    { "x": 30, "y": 52 },
+    { "x": -32, "y": 52 }
+  ],
+  "segments": [
+    { "id": "seg_runner_head", "type": "circle", "point1Index": 0, "point2Index": 1, "color": "#111827", "fillColor": "#fcd34d", "width": 4, "lineCap": "round", "layer": 0, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_torso", "type": "line", "point1Index": 1, "point2Index": 2, "color": "#111827", "fillColor": null, "width": 6, "lineCap": "round", "layer": 1, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_arm_l", "type": "line", "point1Index": 1, "point2Index": 3, "color": "#111827", "fillColor": null, "width": 4, "lineCap": "round", "layer": 2, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_arm_r", "type": "line", "point1Index": 1, "point2Index": 4, "color": "#111827", "fillColor": null, "width": 4, "lineCap": "round", "layer": 3, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_thigh_l", "type": "line", "point1Index": 2, "point2Index": 5, "color": "#111827", "fillColor": null, "width": 5, "lineCap": "round", "layer": 4, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_thigh_r", "type": "line", "point1Index": 2, "point2Index": 6, "color": "#111827", "fillColor": null, "width": 5, "lineCap": "round", "layer": 5, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_leg_l", "type": "line", "point1Index": 5, "point2Index": 7, "color": "#111827", "fillColor": null, "width": 4, "lineCap": "round", "layer": 6, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null },
+    { "id": "seg_runner_leg_r", "type": "line", "point1Index": 6, "point2Index": 8, "color": "#111827", "fillColor": null, "width": 4, "lineCap": "round", "layer": 7, "curved": false, "curvature": 0.3, "hidden": false, "imageData": null, "imageWidth": 100, "imageHeight": "auto", "shapeClosed": true, "filled": true, "controlDX": null, "controlDY": null }
+  ],
+  "animations": [],
+  "canvasWidth": 400,
+  "canvasHeight": 400,
+  "fps": 12,
+  "cycleFills": {},
+  "rootIndices": [0],
+  "visibility": {}
+}
+''';
+
   static List<PredefinedProject> all() => [
         PredefinedProject(
           type: ProjectType.figure,
@@ -100,6 +135,13 @@ class PredefinedProjects {
           name: 'Bounce Ball',
           figure: bounceFigureJson,
           animation: bounceAnimationJson,
+        ),
+        PredefinedProject(
+          type: ProjectType.preset,
+          group: defaultGroup,
+          name: 'Runner',
+          figure: runnerFigureJson,
+          animation: null,
         ),
       ];
 

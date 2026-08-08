@@ -99,7 +99,9 @@ class ProjectGroup {
         name: json['name'] as String? ?? '',
         type: json['type'] == 'figure'
             ? ProjectType.figure
-            : ProjectType.animation,
+            : json['type'] == 'preset'
+                ? ProjectType.preset
+                : ProjectType.animation,
         createdAt: (json['createdAt'] as num?)?.toInt() ?? 0,
       );
 }
@@ -417,10 +419,12 @@ class ProjectStorage {
     List<PredefinedProject> predefs,
   ) async {
     final prefs = await _prefs;
-    if (prefs.getString(_predefInitKey) == '1') return 0;
     var count = 0;
+    final index = await loadIndex();
+    final ids = {for (final p in index) p.id};
     for (final p in predefs) {
       final id = predefProjectId(p.type, p.group, p.name);
+      if (ids.contains(id)) continue;
       await upsertProjectData(
         ProjectMeta(
           id: id,
@@ -435,7 +439,9 @@ class ProjectStorage {
       );
       count++;
     }
-    await prefs.setString(_predefInitKey, '1');
+    if (prefs.getString(_predefInitKey) != '1') {
+      await prefs.setString(_predefInitKey, '1');
+    }
     return count;
   }
 
