@@ -796,20 +796,56 @@ class _EditorScreenState extends State<EditorScreen> {
                         ),
                         const SizedBox(height: 4),
                         Tooltip(
-                          message: 'Toggle Visibility (Coming Soon)',
+                          message: 'Center Figure',
                           child: EditorIconButton(
-                            icon: Icons.visibility,
-                            color: const Color(0xFF3B82F6),
-                            onTap: () {},
+                            icon: Icons.filter_center_focus,
+                            color: const Color(0xFF8B5CF6),
+                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
+                            onTap: () {
+                              final ptIdx = c.selectedPointIndex ??
+                                  (c.selectedSegmentId != null
+                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
+                                      : null);
+                              if (ptIdx != null) {
+                                c.centerFigureAt(ptIdx);
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(height: 4),
                         Tooltip(
-                          message: 'Opacity (Coming Soon)',
+                          message: 'Toggle Visibility',
+                          child: EditorIconButton(
+                            icon: Icons.visibility,
+                            color: const Color(0xFF3B82F6),
+                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
+                            onTap: () {
+                              final ptIdx = c.selectedPointIndex ??
+                                  (c.selectedSegmentId != null
+                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
+                                      : null);
+                              if (ptIdx != null) {
+                                c.toggleFigureVisibility(ptIdx);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Tooltip(
+                          message: 'Opacity',
                           child: EditorIconButton(
                             icon: Icons.opacity,
                             color: const Color(0xFF10B981),
-                            onTap: () {},
+                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
+                            onTap: () {
+                              final ptIdx = c.selectedPointIndex ??
+                                  (c.selectedSegmentId != null
+                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
+                                      : null);
+                              if (ptIdx != null) {
+                                _showOpacitySlider(c, ptIdx);
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -1392,6 +1428,56 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
 
         ],
+      ),
+    );
+  }
+
+  Future<void> _showOpacitySlider(EditorController c, int ptIdx) async {
+    final comp = c.figure.connectedComponent(ptIdx);
+    final root = c.figure.rootIndices.firstWhere(
+      (r) => comp.contains(r),
+      orElse: () => -1,
+    );
+    if (root == -1) return;
+    
+    double currentVal = c.figure.getFigureOpacity(root, c.currentTime);
+    
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final palette = Theme.of(context).appColors;
+          return Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: palette.backgroundElement,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: palette.backgroundSelected),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Opacity',
+                    style: TextStyle(color: palette.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                Slider(
+                  value: currentVal,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 20,
+                  activeColor: const Color(0xFF10B981),
+                  inactiveColor: palette.backgroundSelected,
+                  onChanged: (val) {
+                    setModalState(() => currentVal = val);
+                    c.setFigureOpacity(ptIdx, val);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

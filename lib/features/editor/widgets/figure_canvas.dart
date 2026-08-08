@@ -141,6 +141,36 @@ class _FigureCanvasState extends State<FigureCanvas> {
     return fig.getFigureVisibility(root, t);
   }
 
+  double _opacityAt(Figure fig, int pointIdx, double t) {
+    if (pointIdx < 0 || pointIdx >= fig.points.length) return 1.0;
+    final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
+    var root = roots.first;
+    outer:
+    for (final r in roots) {
+      final visited = <int>{r};
+      final queue = <int>[r];
+      while (queue.isNotEmpty) {
+        final idx = queue.removeAt(0);
+        if (idx == pointIdx) {
+          root = r;
+          break outer;
+        }
+        for (final s in fig.segments) {
+          final other = s.point1Index == idx
+              ? s.point2Index
+              : s.point2Index == idx
+                  ? s.point1Index
+                  : -1;
+          if (other >= 0 && !visited.contains(other)) {
+            visited.add(other);
+            queue.add(other);
+          }
+        }
+      }
+    }
+    return fig.getFigureOpacity(root, t);
+  }
+
   int _hitTestPoint(Offset w) {
     final fig = widget.controller.figure;
     final z = widget.controller.camera.zoom;

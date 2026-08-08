@@ -39,6 +39,23 @@ class VisibilityKeyframe {
   VisibilityKeyframe clone() => VisibilityKeyframe(time, visible);
 }
 
+class OpacityKeyframe {
+  double time;
+  double opacity;
+
+  OpacityKeyframe(this.time, this.opacity);
+
+  Map<String, dynamic> toJson() => {'time': time, 'opacity': opacity};
+
+  factory OpacityKeyframe.fromJson(Map<String, dynamic> json) =>
+      OpacityKeyframe(
+        (json['time'] as num?)?.toDouble() ?? 0,
+        (json['opacity'] as num?)?.toDouble() ?? 1.0,
+      );
+
+  OpacityKeyframe clone() => OpacityKeyframe(time, opacity);
+}
+
 /// A structural layer group (folder) that owns a set of segments. Segments
 /// not listed in any group belong to the implicit default group.
 class LayerGroup {
@@ -107,6 +124,7 @@ class Figure {
   Map<String, CycleFill> cycleFills; // key "p1,p2,p3"
   List<int> rootIndices;
   Map<String, List<VisibilityKeyframe>> visibility;
+  Map<String, List<OpacityKeyframe>> opacity;
   List<LayerGroup> groups;
 
   static const String defaultGroupId = 'layer_default';
@@ -122,6 +140,7 @@ class Figure {
         cycleFills = {},
         rootIndices = [],
         visibility = {},
+        opacity = {},
         groups = [LayerGroup(id: defaultGroupId, name: 'Default')];
 
   int addPoint(double x, double y) {
@@ -281,6 +300,32 @@ class Figure {
   List<VisibilityKeyframe> getFigureVisibilityKeyframes(int root) =>
       visibility[root.toString()] ?? [];
 
+  void setFigureOpacity(int root, double time, double val) {
+    final key = root.toString();
+    final track = opacity.putIfAbsent(key, () => []);
+    final existing = track
+        .where((kf) => (kf.time - time).abs() < 0.001)
+        .toList();
+    if (existing.isNotEmpty) {
+      existing.first.opacity = val;
+    } else {
+      track.add(OpacityKeyframe(time, val));
+      track.sort((a, b) => a.time.compareTo(b.time));
+    }
+  }
+
+  double getFigureOpacity(int root, double time) {
+    final track = opacity[root.toString()] ?? [];
+    var val = 1.0;
+    for (final kf in track) {
+      if (kf.time <= time + 0.0001) val = kf.opacity;
+    }
+    return val;
+  }
+
+  List<OpacityKeyframe> getFigureOpacityKeyframes(int root) =>
+      opacity[root.toString()] ?? [];
+
   /// Returns the connected set of point indices containing [rootIndex].
   Set<int> connectedComponent(int rootIndex) {
     final comp = <int>{rootIndex};
@@ -371,6 +416,15 @@ class Figure {
       });
       visibility = newVis;
     }
+    if (opacity.isNotEmpty) {
+      final newOp = <String, List<OpacityKeyframe>>{};
+      opacity.forEach((k, v) {
+        final rk = int.tryParse(k);
+        if (rk == null || removedSet.contains(rk)) return;
+        newOp[remap(rk).toString()] = v;
+      });
+      opacity = newOp;
+    }
     if (cycleFills.isNotEmpty) {
       final newCF = <String, CycleFill>{};
       cycleFills.forEach((key, entry) {
@@ -424,6 +478,15 @@ class Figure {
         newVis[(rk > movedIdx ? rk - 1 : rk).toString()] = v;
       });
       visibility = newVis;
+    }
+    if (opacity.isNotEmpty) {
+      final newOp = <String, List<OpacityKeyframe>>{};
+      opacity.forEach((k, v) {
+        final rk = int.tryParse(k);
+        if (rk == null || rk == movedIdx) return;
+        newOp[(rk > movedIdx ? rk - 1 : rk).toString()] = v;
+      });
+      opacity = newOp;
     }
     if (cycleFills.isNotEmpty) {
       final newCF = <String, CycleFill>{};
@@ -573,8 +636,9 @@ class Figure {
         'cycleFills': cycleFills.map((k, v) => MapEntry(k, v.toJson())),
         'rootIndices': rootIndices,
         'visibility': visibility.map(
-          (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList()),
-        ),
+            (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
+        'opacity': opacity.map(
+            (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
         'groups': groups.map((g) => g.toJson()).toList(),
       };
 
@@ -651,8 +715,20 @@ class Figure {
       rawVis.forEach((k, v) {
         if (v is List) {
           fig.visibility[k.toString()] = v
-              .whereType<Map<String, dynamic>>()
-              .map((kf) => VisibilityKeyframe.fromJson(kf))
+              .whereType<Map>()
+              .map((e) => VisibilityKeyframe.fromJson(e.cast<String, dynamic>()))
+              .toList();
+        }
+      });
+    }
+
+    final rawOp = data['opacity'];
+    if (rawOp is Map) {
+      rawOp.forEach((k, v) {
+        if (v is List) {
+          fig.opacity[k.toString()] = v
+              .whereType<Map>()
+              .map((e) => OpacityKeyframe.fromJson(e.cast<String, dynamic>()))
               .toList();
         }
       });

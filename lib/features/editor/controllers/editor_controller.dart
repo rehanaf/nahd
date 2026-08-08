@@ -541,6 +541,61 @@ class EditorController extends ChangeNotifier {
     forceUpdate();
   }
 
+  void centerFigureAt(int ptIdx) {
+    if (_figure == null) return;
+    final comp = figure.connectedComponent(ptIdx);
+    final root = figure.rootIndices.firstWhere(
+      (r) => comp.contains(r),
+      orElse: () => -1,
+    );
+    if (root == -1) return;
+    
+    final rootPt = figure.points[root];
+    final dx = -rootPt.x;
+    final dy = -rootPt.y;
+    
+    for (final idx in comp) {
+      if (idx >= 0 && idx < figure.points.length) {
+        final p = figure.points[idx];
+        p.x += dx;
+        p.y += dy;
+      }
+    }
+    pushHistory();
+    forceUpdate();
+  }
+
+  void toggleFigureVisibility(int ptIdx) {
+    if (_figure == null) return;
+    final comp = figure.connectedComponent(ptIdx);
+    final root = figure.rootIndices.firstWhere(
+      (r) => comp.contains(r),
+      orElse: () => -1,
+    );
+    if (root == -1) return;
+
+    final isVisible = figure.getFigureVisibility(root, currentTime);
+    figure.setFigureVisibility(root, currentTime, !isVisible);
+    
+    pushHistory();
+    forceUpdate();
+  }
+
+  void setFigureOpacity(int ptIdx, double val) {
+    if (_figure == null) return;
+    final comp = figure.connectedComponent(ptIdx);
+    final root = figure.rootIndices.firstWhere(
+      (r) => comp.contains(r),
+      orElse: () => -1,
+    );
+    if (root == -1) return;
+
+    figure.setFigureOpacity(root, currentTime, val);
+    
+    pushHistory();
+    forceUpdate();
+  }
+
   // -------------------------------------------------------------------------
   // Playback
   // -------------------------------------------------------------------------

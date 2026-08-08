@@ -476,9 +476,12 @@ class FigureCanvasPainter extends CustomPainter {
       final p1 = fig.points[seg.point1Index];
       final p2 = fig.points[seg.point2Index];
 
+      final opacity = _opacityAt(fig, seg.point1Index, c.currentTime);
+
       if (seg.type == 'line') {
+        final baseColor = parseHexColor(seg.color) ?? const Color(0xFFD1D5DB);
         final paint = Paint()
-          ..color = parseHexColor(seg.color) ?? const Color(0xFFD1D5DB)
+          ..color = baseColor.withOpacity(baseColor.opacity * opacity)
           ..style = PaintingStyle.stroke
           ..strokeWidth = seg.width <= 0 ? 3 : seg.width
           ..strokeCap = _capFor(seg.lineCap);
@@ -503,25 +506,26 @@ class FigureCanvasPainter extends CustomPainter {
           1.0,
         );
         if (seg.filled) {
+          final baseColor = parseHexColor(seg.fillColor) ??
+              parseHexColor(seg.color) ??
+              const Color(0xFFD1D5DB);
           canvas.drawCircle(
             Offset(mx, my),
             r,
-            Paint()..color =
-                parseHexColor(seg.fillColor) ??
-                    parseHexColor(seg.color) ??
-                    const Color(0xFFD1D5DB),
+            Paint()..color = baseColor.withOpacity(baseColor.opacity * opacity),
           );
         }
+        final strokeColor = parseHexColor(seg.color) ?? const Color(0xFFD1D5DB);
         canvas.drawCircle(
           Offset(mx, my),
           r,
           Paint()
-            ..color = parseHexColor(seg.color) ?? const Color(0xFFD1D5DB)
+            ..color = strokeColor.withOpacity(strokeColor.opacity * opacity)
             ..style = PaintingStyle.stroke
             ..strokeWidth = seg.width <= 0 ? 3 : seg.width,
         );
       } else if (seg.type == 'image') {
-        _paintImageSegment(canvas, seg, p1, p2);
+        _paintImageSegment(canvas, seg, p1, p2, opacity);
       }
     }
   }
@@ -544,7 +548,7 @@ class FigureCanvasPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  void _paintImageSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2) {
+  void _paintImageSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2, double opacity) {
     final image = imageFor(seg.imageData);
     if (image == null) return;
     double mx = (p1.x + p2.x) / 2;
@@ -573,7 +577,9 @@ class FigureCanvasPainter extends CustomPainter {
       image,
       Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
       Rect.fromCenter(center: Offset.zero, width: size.width, height: size.height),
-      Paint()..filterQuality = FilterQuality.medium,
+      Paint()
+        ..filterQuality = FilterQuality.medium
+        ..color = Color.fromRGBO(255, 255, 255, opacity),
     );
     canvas.restore();
   }
@@ -725,6 +731,36 @@ class FigureCanvasPainter extends CustomPainter {
       }
     }
     return f.getFigureVisibility(root, t);
+  }
+
+  double _opacityAt(Figure f, int pointIdx, double t) {
+    if (pointIdx < 0 || pointIdx >= f.points.length) return 1.0;
+    final roots = f.rootIndices.isNotEmpty ? f.rootIndices : [0];
+    var root = roots.first;
+    outer:
+    for (final r in roots) {
+      final visited = <int>{r};
+      final queue = <int>[r];
+      while (queue.isNotEmpty) {
+        final idx = queue.removeAt(0);
+        if (idx == pointIdx) {
+          root = r;
+          break outer;
+        }
+        for (final s in f.segments) {
+          final other = s.point1Index == idx
+              ? s.point2Index
+              : s.point2Index == idx
+                  ? s.point1Index
+                  : -1;
+          if (other >= 0 && !visited.contains(other)) {
+            visited.add(other);
+            queue.add(other);
+          }
+        }
+      }
+    }
+    return f.getFigureOpacity(root, t);
   }
 
   @override
