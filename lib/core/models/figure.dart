@@ -206,10 +206,8 @@ class Figure {
   }
 
   Segment addSegment([String type = 'line']) {
-    final cx = canvasWidth / 2;
-    final cy = canvasHeight / 2;
-    final p1 = addPoint(cx - 50, cy);
-    final p2 = addPoint(cx + 50, cy);
+    final p1 = addPoint(0, 0);
+    final p2 = addPoint(100, 0);
     return createSegment(type, p1, p2);
   }
 
