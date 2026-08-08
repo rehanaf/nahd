@@ -298,10 +298,9 @@ class _SegmentInspectorState extends State<SegmentInspector> {
       final bytes = result.files.first.bytes;
       if (bytes == null) return;
       final ext = _extFor(result.files.first.extension);
-      seg.imageData = 'data:image/$ext;base64,${base64Encode(bytes)}';
+      widget.controller.addSegmentImage(
+          seg.id, 'data:image/$ext;base64,${base64Encode(bytes)}');
       setState(() {});
-      widget.controller.forceUpdate();
-      widget.controller.pushHistory();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1186,50 +1185,14 @@ class _SegmentInspectorState extends State<SegmentInspector> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Source',
+          Text('Sprite (${seg.imageDataList.length})',
               style: TextStyle(
                   color: palette.textSecondary,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1)),
           const SizedBox(height: 6),
-          if (seg.imageData != null) ...[
-            Image.memory(
-              _decodeImageData(seg.imageData!),
-              height: 120,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: isAnimating
-                  ? null
-                  : () {
-                      seg.imageData = null;
-                      setState(() {});
-                      c.forceUpdate();
-                      c.pushHistory();
-                    },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0x1AEF4444),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: palette.border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.close, size: 14, color: Color(0xFFF87171)),
-                    const SizedBox(width: 8),
-                    Text('Remove Image',
-                        style: TextStyle(
-                            color: Color(0xFFF87171),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-            ),
-          ] else
+          if (seg.imageDataList.isEmpty) ...[
             InkWell(
               onTap: isAnimating ? null : () => _pickImage(seg),
               child: Container(
@@ -1255,6 +1218,52 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                 ),
               ),
             ),
+          ] else ...[
+            _spriteStrip(seg, palette, isAnimating),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (!isAnimating) ...[
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _pickImage(seg),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 10),
+                        decoration: BoxDecoration(
+                          color: palette.background,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: palette.border),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined,
+                                size: 14, color: palette.textSecondary),
+                            const SizedBox(width: 6),
+                            Text('Tambah Gambar',
+                                style: TextStyle(
+                                    color: palette.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Expanded(
+                    child: Text(
+                      'Aktif frame ${_activeImageIndex(seg) + 1} dari '
+                      '${seg.imageDataList.length}',
+                      style: TextStyle(
+                          color: palette.textSecondary, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Text('Width',
               style: TextStyle(
@@ -1297,6 +1306,112 @@ class _SegmentInspectorState extends State<SegmentInspector> {
         ],
       ),
     );
+  }
+
+  /// Horizontal strip of sprite thumbnails. Tapping an image selects it: in
+  /// figure mode it becomes [Segment.activeImageIndex]; in preset/animate mode
+  /// it is recorded as a per-frame keyframe via [EditorController.selectSegmentImage].
+  Widget _spriteStrip(Segment seg, AppPalette palette, bool isAnimating) {
+    final c = widget.controller;
+    final activeIdx = _activeImageIndex(seg);
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: seg.imageDataList.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final isActive = i == activeIdx;
+          return GestureDetector(
+            onTap: () {
+              c.selectSegmentImage(seg.id, i);
+              setState(() {});
+            },
+            child: Stack(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: palette.background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isActive
+                          ? const Color(0xFF3B82F6)
+                          : palette.border,
+                      width: isActive ? 2 : 1,
+                    ),
+                  ),
+                  child: seg.imageDataList[i].isEmpty
+                      ? const Icon(Icons.broken_image)
+                      : Image.memory(
+                          _decodeImageData(seg.imageDataList[i]),
+                          fit: BoxFit.contain,
+                        ),
+                ),
+                Positioned(
+                  left: 2,
+                  top: 2,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '${i + 1}',
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 9),
+                    ),
+                  ),
+                ),
+                if (isActive)
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Icon(Icons.check_circle,
+                        size: 14, color: const Color(0xFF3B82F6)),
+                  ),
+                if (!isAnimating)
+                  Positioned(
+                    right: 2,
+                    bottom: 2,
+                    child: GestureDetector(
+                      onTap: () {
+                        c.removeSegmentImage(seg.id, i);
+                        setState(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xCCEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close,
+                            size: 10, color: Colors.white),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Active sprite index for the segment: in animate/preset mode the per-frame
+  /// keyframe value (falling back to the segment's active index); otherwise the
+  /// segment's active index directly.
+  int _activeImageIndex(Segment seg) {
+    if (widget.controller.isAnimateMode) {
+      return widget.controller.figure
+              .getSegmentImageIndex(seg.id, widget.controller.currentTime) ??
+          seg.activeImageIndex;
+    }
+    return seg.activeImageIndex;
   }
 
   Uint8List _decodeImageData(String dataUri) {

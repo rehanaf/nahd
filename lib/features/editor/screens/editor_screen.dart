@@ -867,6 +867,81 @@ class _EditorScreenState extends State<EditorScreen> {
                             },
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Builder(builder: (btnCtx) {
+                          final ptIdx = c.selectedSegmentId != null
+                              ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
+                              : c.selectedPointIndex;
+                          final hasSelection = ptIdx != null &&
+                              ptIdx >= 0 &&
+                              ptIdx < c.figure.points.length;
+                          final cur = hasSelection
+                              ? c.figureColorOverrideAt(ptIdx)
+                              : null;
+                          return Tooltip(
+                            message: hasSelection
+                                ? (cur != null
+                                    ? 'Figure Color (tap to change, long-press to clear)'
+                                    : 'Figure Color')
+                                : 'Figure Color',
+                            child: GestureDetector(
+                              onLongPress: hasSelection
+                                  ? () => c.clearFigureColorOverride(ptIdx)
+                                  : null,
+                              child: ColorCircle(
+                                color: parseHexColor(cur) ??
+                                    const Color(0xFF8B5CF6),
+                                disabled: !hasSelection,
+                                onTap: hasSelection
+                                    ? () async {
+                                        final Color? picked =
+                                            await showColorPickerSheet(
+                                                btnCtx,
+                                                parseHexColor(cur) ??
+                                                    const Color(0xFF8B5CF6));
+                                        if (picked != null) {
+                                          c.setFigureColorOverride(
+                                              ptIdx, colorToHex(picked));
+                                        }
+                                      }
+                                    : null,
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 4),
+                        Builder(builder: (btnCtx) {
+                          final seg = c.selectedSegmentId != null
+                              ? c.figure.getSegment(c.selectedSegmentId!)
+                              : null;
+                          final isSpriteImage =
+                              seg != null && seg.type == 'image' &&
+                                  seg.imageDataList.length > 1;
+                          return Tooltip(
+                            message: isSpriteImage
+                                ? 'Sprite Frame (tap to cycle)'
+                                : 'Sprite Frame (select an image segment)',
+                            child: EditorIconButton(
+                              icon: Icons.photo_library,
+                              color: const Color(0xFFEC4899),
+                              disabled: !isSpriteImage,
+                              onTap: isSpriteImage
+                                  ? () {
+                                      final curIdx = c
+                                              .figure
+                                              .getSegmentImageIndex(
+                                                  seg.id,
+                                                  c.currentTime) ??
+                                          seg.activeImageIndex;
+                                      final next =
+                                          (curIdx + 1) %
+                                              seg.imageDataList.length;
+                                      c.selectSegmentImage(seg.id, next);
+                                    }
+                                  : null,
+                            ),
+                          );
+                        }),
                         const SizedBox(height: 8),
                         Container(height: 1, width: 24, color: palette.border),
                         const SizedBox(height: 8),
@@ -1196,7 +1271,14 @@ class _EditorScreenState extends State<EditorScreen> {
                                           final ext = result.files.first.extension ?? 'png';
                                           final b64 = base64Encode(bytes);
                                           final dataUri = 'data:image/$ext;base64,$b64';
-                                          setState(() { seg.imageData = dataUri; });
+                                          setState(() {
+                                            if (seg.imageDataList.isEmpty) {
+                                              seg.imageDataList.add(dataUri);
+                                              seg.activeImageIndex = 0;
+                                            } else {
+                                              seg.imageDataList[seg.activeImageIndex] = dataUri;
+                                            }
+                                          });
                                           c.forceUpdate(); c.pushHistory();
                                         }
                                       }

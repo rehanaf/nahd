@@ -616,17 +616,98 @@ class EditorController extends ChangeNotifier {
     forceUpdate();
   }
 
-  void setFigureColorOverride(int ptIdx, String color) {
-    if (_figure == null) return;
+  int _rootForPoint(int ptIdx) {
+    if (ptIdx < 0 || ptIdx >= figure.points.length) return -1;
     final comp = figure.connectedComponent(ptIdx);
-    final root = figure.rootIndices.firstWhere(
+    return figure.rootIndices.firstWhere(
       (r) => comp.contains(r),
       orElse: () => -1,
     );
+  }
+
+  void setFigureColorOverride(int ptIdx, String color) {
+    if (_figure == null) return;
+    final root = _rootForPoint(ptIdx);
     if (root == -1) return;
 
     figure.setFigureColorOverride(root, currentTime, color);
-    
+
+    pushHistory();
+    forceUpdate();
+  }
+
+  /// The figure-wide colour override applied, place as the current frame, or
+  /// null when the figure uses its natural segment colours.
+  String? figureColorOverrideAt(int ptIdx) {
+    if (_figure == null || !isAnimateMode) return null;
+    final root = _rootForPoint(ptIdx);
+    if (root == -1) return null;
+    return figure.getFigureColorOverride(root, currentTime);
+  }
+
+  /// Removes the figure-wide colour override keyframe at the current time.
+  void clearFigureColorOverride(int ptIdx) {
+    if (_figure == null) return;
+    final root = _rootForPoint(ptIdx);
+    if (root == -1) return;
+    figure.removeFigureColorOverride(root, currentTime);
+    pushHistory();
+    forceUpdate();
+  }
+
+  /// Adds another image to a segment's sprite list and makes it the active
+  /// image (figure mode only; the list is structural).
+  void addSegmentImage(String segId, String data) {
+    if (_figure == null) return;
+    final seg = figure.getSegment(segId);
+    if (seg == null) return;
+    seg.imageDataList.add(data);
+    seg.activeImageIndex = seg.imageDataList.length - 1;
+    pushHistory();
+    forceUpdate();
+  }
+
+  /// Removes an image at [index] from a segment's sprite list and renumbers
+  /// any frame keyframes pointing past it.
+  void removeSegmentImage(String segId, int index) {
+    if (_figure == null) return;
+    final seg = figure.getSegment(segId);
+    if (seg == null || index < 0 || index >= seg.imageDataList.length) return;
+    seg.imageDataList.removeAt(index);
+    if (seg.activeImageIndex >= seg.imageDataList.length) {
+      seg.activeImageIndex = seg.imageDataList.isEmpty
+          ? 0
+          : seg.imageDataList.length - 1;
+    }
+    final tracks = figure.segmentImages[segId];
+    if (tracks != null) {
+      tracks.removeWhere((kf) => kf.imageIndex == index);
+      for (final kf in tracks) {
+        if (kf.imageIndex > index) kf.imageIndex--;
+      }
+      if (tracks.isEmpty) figure.segmentImages.remove(segId);
+    }
+    pushHistory();
+    forceUpdate();
+  }
+
+  /// Selects an image of a segment's sprite list. In preset/animate mode the
+  /// selection is recorded as a per-frame keyframe; in figure mode it sets the
+  /// active image directly.
+  void selectSegmentImage(String segId, int imageIndex) {
+    if (_figure == null) return;
+    final seg = figure.getSegment(segId);
+    if (seg == null || seg.imageDataList.isEmpty) return;
+    final clamped = imageIndex < 0
+        ? 0
+        : imageIndex >= seg.imageDataList.length
+            ? seg.imageDataList.length - 1
+            : imageIndex;
+    if (isAnimateMode) {
+      figure.setSegmentImageIndex(segId, currentTime, clamped);
+    } else {
+      seg.activeImageIndex = clamped;
+    }
     pushHistory();
     forceUpdate();
   }
