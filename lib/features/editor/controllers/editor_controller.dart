@@ -164,9 +164,8 @@ class EditorController extends ChangeNotifier {
   bool get isAnimateMode => editorMode == EditorMode.animate;
 
   double get frameDuration => 1.0 / fps;
-  int get totalFrames =>
-      duration <= 0 ? 1 : (duration * fps).round().clamp(1, 1000000);
-  int get currentFrame => (currentTime * fps).round().clamp(0, totalFrames - 1);
+  int get totalFrames => duration <= 0 ? 1 : duration.round().clamp(1, 1000000);
+  int get currentFrame => currentTime.round().clamp(0, totalFrames - 1);
 
   // -------------------------------------------------------------------------
   // Loading
@@ -189,7 +188,8 @@ class EditorController extends ChangeNotifier {
           if (parsed.segments.isNotEmpty) figure = parsed;
         }
         if (data.animation != null) {
-          anim = FigureAnimation.fromJsonString(data.animation!);
+          anim = FigureAnimation.fromJsonString(data.animation!,
+              legacyFps: figure.fps);
         }
       }
     }
@@ -201,6 +201,7 @@ class EditorController extends ChangeNotifier {
       initialAnimation: anim,
     );
     controller.loaded = true;
+    controller._syncPointModesFromFigure();
     controller._pushHistory(force: true);
     controller.notifyListeners();
     return controller;
@@ -275,13 +276,30 @@ class EditorController extends ChangeNotifier {
     final current = pointModes[index];
     if (current == 'static') {
       pointModes[index] = 'dynamic';
+      if (index >= 0 && index < figure.points.length) {
+        figure.points[index].isStatic = false;
+      }
     } else {
       pointModes[index] = 'static';
+      if (index >= 0 && index < figure.points.length) {
+        figure.points[index].isStatic = true;
+      }
     }
     notifyListeners();
   }
 
   bool isPointStatic(int index) => pointModes[index] == 'static';
+
+  /// Rebuilds [pointModes] from the figure's persisted per-point static flags.
+  void _syncPointModesFromFigure() {
+    pointModes.clear();
+    if (_figure == null) return;
+    for (var i = 0; i < _figure!.points.length; i++) {
+      if (_figure!.points[i].isStatic) {
+        pointModes[i] = 'static';
+      }
+    }
+  }
 
   /// Adds a brand-new segment (which always has two points) as a new
   /// sub-figure: the first point becomes a new root so it gets its own
@@ -587,11 +605,7 @@ class EditorController extends ChangeNotifier {
 
   void toggleFigureVisibility(int ptIdx) {
     if (_figure == null) return;
-    final comp = figure.connectedComponent(ptIdx);
-    final root = figure.rootIndices.firstWhere(
-      (r) => comp.contains(r),
-      orElse: () => -1,
-    );
+    final root = _figureKeyForPoint(ptIdx);
     if (root == -1) return;
 
     final isVisible = figure.getFigureVisibility(root, currentTime);
@@ -603,11 +617,7 @@ class EditorController extends ChangeNotifier {
 
   void setFigureOpacity(int ptIdx, double val) {
     if (_figure == null) return;
-    final comp = figure.connectedComponent(ptIdx);
-    final root = figure.rootIndices.firstWhere(
-      (r) => comp.contains(r),
-      orElse: () => -1,
-    );
+    final root = _figureKeyForPoint(ptIdx);
     if (root == -1) return;
 
     figure.setFigureOpacity(root, currentTime, val);
@@ -616,18 +626,18 @@ class EditorController extends ChangeNotifier {
     forceUpdate();
   }
 
-  int _rootForPoint(int ptIdx) {
+  /// Resolves the per-figure key for [ptIdx]. Uses [Figure.figureKeyFor] so
+  /// overrides (visibility/opacity/color) stay scoped to a single figure, even
+  /// when the figure was attached to another (attached figures keep a joint
+  /// separated from the merged root).
+  int _figureKeyForPoint(int ptIdx) {
     if (ptIdx < 0 || ptIdx >= figure.points.length) return -1;
-    final comp = figure.connectedComponent(ptIdx);
-    return figure.rootIndices.firstWhere(
-      (r) => comp.contains(r),
-      orElse: () => -1,
-    );
+    return figure.figureKeyFor(ptIdx);
   }
 
   void setFigureColorOverride(int ptIdx, String color) {
     if (_figure == null) return;
-    final root = _rootForPoint(ptIdx);
+    final root = _figureKeyForPoint(ptIdx);
     if (root == -1) return;
 
     figure.setFigureColorOverride(root, currentTime, color);
@@ -640,7 +650,7 @@ class EditorController extends ChangeNotifier {
   /// null when the figure uses its natural segment colours.
   String? figureColorOverrideAt(int ptIdx) {
     if (_figure == null || !isAnimateMode) return null;
-    final root = _rootForPoint(ptIdx);
+    final root = _figureKeyForPoint(ptIdx);
     if (root == -1) return null;
     return figure.getFigureColorOverride(root, currentTime);
   }
@@ -648,7 +658,7 @@ class EditorController extends ChangeNotifier {
   /// Removes the figure-wide colour override keyframe at the current time.
   void clearFigureColorOverride(int ptIdx) {
     if (_figure == null) return;
-    final root = _rootForPoint(ptIdx);
+    final root = _figureKeyForPoint(ptIdx);
     if (root == -1) return;
     figure.removeFigureColorOverride(root, currentTime);
     pushHistory();
@@ -723,18 +733,12 @@ class EditorController extends ChangeNotifier {
   // Playback
   // -------------------------------------------------------------------------
 
+  /// Sets the playback FPS. FPS only affects how fast frames are played; it
+  /// never rescales keyframes, the timeline length, or the total frame count.
   void setFps(double f) {
     final newFps = f.clamp(1, 60).toDouble();
-    final prevTotal = totalFrames;
     fps = newFps;
     figure.fps = newFps;
-    if (_duration > 0) {
-      final newDuration = prevTotal / newFps;
-      _duration = newDuration;
-      if (currentAnimation != null && currentAnimation!.duration > 0) {
-        currentAnimation!.duration = newDuration;
-      }
-    }
     forceUpdate();
   }
 
@@ -774,7 +778,9 @@ class EditorController extends ChangeNotifier {
       (_) {
         final elapsed =
             DateTime.now().difference(startWall).inMicroseconds / 1e6;
-        var t = (startT + elapsed) % duration;
+        // FPS translates wall-clock elapsed time into frames; the stored
+        // timeline itself is fps-independent.
+        var t = (startT + elapsed * fps) % duration;
         _applyAnimationAt(t);
       },
     );
@@ -789,7 +795,7 @@ class EditorController extends ChangeNotifier {
 
   void stepFrame(int delta) {
     var frame = currentFrame + delta;
-    var t = frame * frameDuration;
+    var t = frame.toDouble();
     if (t >= duration && frame >= totalFrames) {
       if (duration > 0) {
         frame = 0;
@@ -854,7 +860,7 @@ class EditorController extends ChangeNotifier {
       final track = anim.getOrCreateTrack(e.key);
       track.addKeyframe(t, e.value.x, e.value.y);
     }
-    if (anim.duration < t) anim.duration = t;
+    if (anim.duration < t + 1) anim.duration = t + 1;
     forceUpdate();
     applyPose();
   }

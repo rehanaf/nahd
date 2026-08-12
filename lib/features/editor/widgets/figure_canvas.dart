@@ -114,62 +114,12 @@ class _FigureCanvasState extends State<FigureCanvas> {
 
   bool _visibleAt(Figure fig, int pointIdx, double t) {
     if (pointIdx < 0 || pointIdx >= fig.points.length) return true;
-    final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
-    var root = roots.first;
-    outer:
-    for (final r in roots) {
-      final visited = <int>{r};
-      final queue = <int>[r];
-      while (queue.isNotEmpty) {
-        final idx = queue.removeAt(0);
-        if (idx == pointIdx) {
-          root = r;
-          break outer;
-        }
-        for (final s in fig.segments) {
-          final other = s.point1Index == idx
-              ? s.point2Index
-              : s.point2Index == idx
-                  ? s.point1Index
-                  : -1;
-          if (other >= 0 && !visited.contains(other)) {
-            visited.add(other);
-            queue.add(other);
-          }
-        }
-      }
-    }
-    return fig.getFigureVisibility(root, t);
+    return fig.getFigureVisibility(fig.figureKeyFor(pointIdx), t);
   }
 
   double _opacityAt(Figure fig, int pointIdx, double t) {
     if (pointIdx < 0 || pointIdx >= fig.points.length) return 1.0;
-    final roots = fig.rootIndices.isNotEmpty ? fig.rootIndices : [0];
-    var root = roots.first;
-    outer:
-    for (final r in roots) {
-      final visited = <int>{r};
-      final queue = <int>[r];
-      while (queue.isNotEmpty) {
-        final idx = queue.removeAt(0);
-        if (idx == pointIdx) {
-          root = r;
-          break outer;
-        }
-        for (final s in fig.segments) {
-          final other = s.point1Index == idx
-              ? s.point2Index
-              : s.point2Index == idx
-                  ? s.point1Index
-                  : -1;
-          if (other >= 0 && !visited.contains(other)) {
-            visited.add(other);
-            queue.add(other);
-          }
-        }
-      }
-    }
-    return fig.getFigureOpacity(root, t);
+    return fig.getFigureOpacity(fig.figureKeyFor(pointIdx), t);
   }
 
   int _hitTestPoint(Offset w) {
@@ -727,15 +677,16 @@ class _FigureCanvasState extends State<FigureCanvas> {
     }
 
     // UNJOIN: a shared joint dragged apart from its neighbours. Split the
-    // segment that is most perpendicular/opposite to the drag direction so
-    // the dragged side keeps moving and the other side keeps a copy.
+    // segment that is most opposite to the drag direction, so the side being
+    // pulled away (aligned with the drag) keeps moving and the opposite side
+    // keeps a copy anchored at the original joint position.
     final dx = pt.x - d.startPtX;
     final dy = pt.y - d.startPtY;
     final movedDist = math.sqrt(dx * dx + dy * dy);
     if (movedDist < threshold) return;
 
     Segment? detachSeg;
-    double bestScore = double.negativeInfinity;
+    double bestScore = double.infinity;
     for (final s in touching) {
       final other = s.point1Index == d.ptIdx
           ? s.point2Index
@@ -746,9 +697,12 @@ class _FigureCanvasState extends State<FigureCanvas> {
       final oy = o.y - d.startPtY;
       final len = math.sqrt(ox * ox + oy * oy);
       if (len < 0.001) continue;
-      // Alignment of the neighbour direction with the drag direction.
-      final score = (ox * dx + oy * dy) / (len * math.sqrt(dx * dx + dy * dy));
-      if (score > bestScore) {
+      // Score = dot(neighbour dir, drag dir): the smallest (most negative)
+      // score is the segment pointing AWAY from the pulled side, so it stays
+      // with the static joint copy while the rest follows the pointer.
+      final score = (ox * dx + oy * dy) /
+          (len * math.sqrt(dx * dx + dy * dy));
+      if (score < bestScore) {
         bestScore = score;
         detachSeg = s;
       }

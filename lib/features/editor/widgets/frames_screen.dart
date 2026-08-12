@@ -31,13 +31,13 @@ class _FramesScreenState extends State<FramesScreen> {
 
   Figure _thumbFor(int frame) {
     return _cache.putIfAbsent(frame, () {
-      final t = frame * c.frameDuration;
+      final t = frame.toDouble();
       return c.thumbnailFigure(t);
     });
   }
 
   void _goToFrame(int frame) {
-    c.setCurrentTime(frame * c.frameDuration);
+    c.setCurrentTime(frame.toDouble());
     c.applyPose();
     Navigator.of(context).pop();
   }
@@ -118,7 +118,7 @@ class _FramesScreenState extends State<FramesScreen> {
 
   Widget _cell(AppPalette palette, int frame) {
     final isSelected = frame == _selected;
-    final t = frame * c.frameDuration;
+    final t = frame.toDouble();
     return GestureDetector(
       onTap: () => _goToFrame(frame),
       onLongPress: () => _showFrameMenu(frame, t),

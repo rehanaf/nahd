@@ -17,16 +17,20 @@ class AnimationTransport extends StatelessWidget {
     final currentFrame = controller.currentFrame;
 
     void goPrev() {
-      controller.setCurrentTime((controller.currentTime - controller.frameDuration).clamp(0.0, controller.duration));
+      final t = (controller.currentTime - 1).clamp(0.0, controller.duration);
+      controller.setCurrentTime(t);
+      controller.ensureAnimation();
       controller.applyPose();
     }
 
     void goNext() {
-      final nt = controller.currentTime + controller.frameDuration;
-      if (nt > controller.duration) {
-        controller.setDuration(nt);
+      final next = controller.currentFrame + 1;
+      var nt = next.toDouble();
+      if (nt + 0.001 >= controller.duration) {
+        // Extend the timeline so the new frame actually exists.
+        controller.setDuration(nt + 1);
         final anim = controller.ensureAnimation();
-        if (nt > anim.duration) anim.duration = nt;
+        if (nt + 1 > anim.duration) anim.duration = nt + 1;
         controller.forceUpdate();
       }
       controller.setCurrentTime(nt);

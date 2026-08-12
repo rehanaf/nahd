@@ -308,6 +308,57 @@ class Figure {
   List<int> getFigureRoots() =>
       (rootIndices.isNotEmpty) ? List.of(rootIndices) : [0];
 
+  /// Stable per-figure key for [pointIdx] inside a merged (attached) figure.
+  ///
+  /// A merged component normally has a single root, so figure-wide overrides
+  /// (color/visibility/opacity) would bleed from the root figure into any
+  /// attached figure. Points that are marked `isAttached` are treated as the
+  /// joints that separate figures: the side beyond such a joint gets its own
+  /// key (the joint point index) so overrides stay scoped to one figure.
+  int figureKeyFor(int pointIdx) {
+    if (pointIdx < 0 || pointIdx >= points.length) return 0;
+    final roots = getFigureRoots();
+    if (roots.isEmpty) return 0;
+    final map = <int, int>{};
+    for (final r in roots) {
+      if (map.containsKey(r)) continue;
+      final stack = <int>[r];
+      map[r] = r;
+      while (stack.isNotEmpty) {
+        final cur = stack.removeLast();
+        for (final s in segments) {
+          final other = s.point1Index == cur
+              ? s.point2Index
+              : s.point2Index == cur
+                  ? s.point1Index
+                  : -1;
+          if (other < 0 || other >= points.length) continue;
+          if (map.containsKey(other)) continue;
+          // The neighbour beyond an attached joint starts its own figure.
+          map[other] = points[cur].isAttached ? cur : map[cur]!;
+          stack.add(other);
+        }
+      }
+    }
+    return map[pointIdx] ?? roots.first;
+  }
+
+  /// Stable per-figure key for a [seg]. At a joint boundary the two endpoints
+  /// map to different keys (the joint itself maps to the host figure); a
+  /// segment that spans two figures belongs to the side whose endpoint is NOT
+  /// the attached joint, so overrides apply to the correct figure regardless
+  /// of which endpoint is `point1`.
+  int segmentFigureKey(Segment seg) {
+    final k1 = figureKeyFor(seg.point1Index);
+    final k2 = figureKeyFor(seg.point2Index);
+    if (k1 == k2) return k1;
+    final a = points[seg.point1Index].isAttached;
+    final b = points[seg.point2Index].isAttached;
+    if (a && !b) return k2;
+    if (b && !a) return k1;
+    return k1;
+  }
+
   void setFigureVisibility(int root, double time, bool visible) {
     final key = root.toString();
     final track = visibility.putIfAbsent(key, () => []);
@@ -442,23 +493,27 @@ class Figure {
   }
 
   /// Recomputes [rootIndices] so that every segment-connected component of
-  /// points has at least one root. Existing roots are preserved; a component
-  /// that ends up root-less (e.g. after a segment delete or split detaches a
-  /// part) gains the lowest point of its component as a new root.
+  /// points has EXACTLY one root. A component that ends up root-less (e.g.
+  /// after a segment delete or split detaches a part) gains the lowest point
+  /// of its component as a new root; a component that gained extra roots
+  /// (e.g. from a merge) keeps only the lowest of its existing roots.
   void repairRoots() {
     if (points.isEmpty) {
       rootIndices = [];
       return;
     }
     final visited = <int>{};
-    final newRoots = List.of(rootIndices);
+    final newRoots = <int>[];
     for (var start = 0; start < points.length; start++) {
       if (visited.contains(start)) continue;
       final comp = connectedComponent(start);
       visited.addAll(comp);
-      if (!rootIndices.any(comp.contains)) {
+      final existing = rootIndices.where(comp.contains).toList();
+      if (existing.isNotEmpty) {
+        newRoots.add(existing.reduce((a, b) => a < b ? a : b));
+      } else {
         final root = comp.reduce((a, b) => a < b ? a : b);
-        if (root >= 0 && root < points.length && !newRoots.contains(root)) {
+        if (root >= 0 && root < points.length) {
           newRoots.add(root);
         }
       }
@@ -720,6 +775,7 @@ class Figure {
 
   Map<String, dynamic> toJson() => {
         'name': name,
+        'timeUnit': 'frame',
         'points': points.map((p) => p.toJson()).toList(),
         'segments': segments.map((s) => s.toJson()).toList(),
         'animations': animations,
@@ -785,6 +841,7 @@ class Figure {
     fig.canvasWidth = (data['canvasWidth'] as num?)?.toDouble() ?? 1280;
     fig.canvasHeight = (data['canvasHeight'] as num?)?.toDouble() ?? 720;
     fig.fps = (data['fps'] as num?)?.toDouble() ?? 12;
+    final legacySeconds = data['timeUnit'] != 'frame' && fig.fps > 0;
     fig.canvasColor = data['canvasColor'] as String? ?? '#ffffff';
 
     final rawCF = data['cycleFills'];
@@ -862,6 +919,22 @@ class Figure {
           .whereType<Map<String, dynamic>>()
           .map((g) => LayerGroup.fromJson(g))
           .toList();
+    }
+    if (legacySeconds) {
+      // Pre-frame-unit save: keyframe times were stored in seconds. Convert to
+      // frame indices so the timeline is fps-independent.
+      for (final kf in fig.visibility.values.expand((l) => l)) {
+        kf.time = kf.time * fig.fps;
+      }
+      for (final kf in fig.opacity.values.expand((l) => l)) {
+        kf.time = kf.time * fig.fps;
+      }
+      for (final kf in fig.colors.values.expand((l) => l)) {
+        kf.time = kf.time * fig.fps;
+      }
+      for (final kf in fig.segmentImages.values.expand((l) => l)) {
+        kf.time = kf.time * fig.fps;
+      }
     }
     fig.ensureDefaultGroup();
     return fig;

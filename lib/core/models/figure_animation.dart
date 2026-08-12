@@ -2,6 +2,8 @@ import '../json_utils.dart';
 import 'figure.dart';
 
 class PointKeyframe {
+  /// Timeline position in FRAME indices (not seconds). Frame index is the
+  /// stored unit; fps only affects playback speed.
   double time;
   double x;
   double y;
@@ -97,6 +99,10 @@ class PointTrack {
 
 class FigureAnimation {
   String name;
+
+  /// Number of frames in the timeline (>= 0). This is decoupled from [Figure.fps]:
+  /// fps only controls playback speed, it never rescales keyframes, duration, or
+  /// the total frame count.
   double duration;
   List<PointTrack> tracks;
 
@@ -122,10 +128,10 @@ class FigureAnimation {
     return track;
   }
 
-  void setPointPose(double time, int pointIndex, double x, double y) {
+  void setPointPose(double frame, int pointIndex, double x, double y) {
     final track = getOrCreateTrack(pointIndex);
-    track.addKeyframe(time, x, y);
-    if (duration < time) duration = time;
+    track.addKeyframe(frame, x, y);
+    if (duration < frame + 1) duration = frame + 1;
   }
 
   bool removePointPose(double time, int pointIndex) {
@@ -154,13 +160,17 @@ class FigureAnimation {
 
   Map<String, dynamic> toJson() => {
         'name': name,
+        'timeUnit': 'frame',
         'duration': duration,
         'tracks': tracks.map((t) => t.toJson()).toList(),
       };
 
   String exportToJson() => jsonEncodePretty(toJson());
 
-  factory FigureAnimation.fromJson(Map<String, dynamic> data) {
+  factory FigureAnimation.parse(
+    Map<String, dynamic> data, {
+    double? legacyFps,
+  }) {
     final anim = FigureAnimation(data['name'] as String? ?? 'Animation');
     anim.duration = (data['duration'] as num?)?.toDouble() ?? 0;
     final raw = data['tracks'];
@@ -169,11 +179,21 @@ class FigureAnimation {
         anim.addTrack(PointTrack.fromJson(td));
       }
     }
+    final isLegacy = data['timeUnit'] != 'frame';
+    if (isLegacy && (legacyFps ?? 0) > 0) {
+      for (final track in anim.tracks) {
+        for (final kf in track.keyframes) {
+          kf.time = kf.time * legacyFps!;
+        }
+      }
+      anim.duration = anim.duration * legacyFps!;
+    }
     return anim;
   }
 
-  factory FigureAnimation.fromJsonString(String json) =>
-      FigureAnimation.fromJson(jsonDecodeSafe(json));
+  factory FigureAnimation.fromJsonString(String json,
+          {double? legacyFps}) =>
+      FigureAnimation.parse(jsonDecodeSafe(json), legacyFps: legacyFps);
 
-  FigureAnimation clone() => FigureAnimation.fromJson(toJson());
+  FigureAnimation clone() => FigureAnimation.parse(toJson());
 }

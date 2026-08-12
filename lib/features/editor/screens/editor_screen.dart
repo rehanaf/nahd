@@ -201,11 +201,11 @@ class _EditorScreenState extends State<EditorScreen> {
       }
       src.cycleFills.forEach((key, entry) {
         final parts = key.split(',').map(int.tryParse).whereType<int>().toList();
-        if (parts.length != 2) return;
-        final a = indexMap[parts[0]];
-        final b = indexMap[parts[1]];
-        if (a == null || b == null) return;
-        c.figure.cycleFills['$a,$b'] = entry.clone();
+        if (parts.length < 2) return;
+        final mapped = parts.map((p) => indexMap[p]).whereType<int>().toList();
+        if (mapped.length != parts.length) return;
+        mapped.sort();
+        c.figure.cycleFills[mapped.join(',')] = entry.clone();
       });
       c.mergeGroupsFrom(src);
       c.forceUpdate();
@@ -1483,6 +1483,18 @@ class _EditorScreenState extends State<EditorScreen> {
                       onTap: () {
                         setState(() => _showMenu = false);
                         widget.controller.importSvgAsImage().then((msg) {
+                          if (msg != null) _showSnack(msg);
+                        });
+                      },
+                    ),
+                    _MenuItem(
+                      icon: Icons.face,
+                      label: 'Import Minecraft Skin',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        widget.controller
+                            .importMinecraftSkin(context)
+                            .then((msg) {
                           if (msg != null) _showSnack(msg);
                         });
                       },

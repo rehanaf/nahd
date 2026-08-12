@@ -131,7 +131,7 @@ extension _TransformTools on _FigureCanvasState {
   }
 
   bool _handleRotateStart(Offset w, Figure fig) {
-    final ptHit = _hitTestPoint(w);
+    var ptHit = _hitTestPoint(w);
     if (ptHit < 0) {
       widget.controller.setSelectedPoint(null);
       widget.controller.setSelectedSegment(null);
@@ -145,7 +145,7 @@ extension _TransformTools on _FigureCanvasState {
     }
 
     widget.controller.setSelectedPoint(ptHit);
-    final seg = _segmentTouching(fig, ptHit);
+    var seg = _segmentTouching(fig, ptHit);
     widget.controller.setSelectedSegment(seg?.id);
 
     final comp = fig.connectedComponent(ptHit);
@@ -167,7 +167,45 @@ extension _TransformTools on _FigureCanvasState {
       adj[s.point2Index]!.add(s.point1Index);
     }
 
-    // DFS to find the local cycle loop that contains ptHit
+    // Spanning tree from subRoot to know depths and parents.
+    final parent = <int, int>{};
+    final depth = <int, int>{subRoot: 0};
+    final queue = <int>[subRoot];
+    final visitedBFS = <int>{subRoot};
+    while (queue.isNotEmpty) {
+      final cur = queue.removeAt(0);
+      for (final other in adj[cur]!) {
+        if (visitedBFS.contains(other)) continue;
+        visitedBFS.add(other);
+        parent[other] = cur;
+        depth[other] = depth[cur]! + 1;
+        queue.add(other);
+      }
+    }
+
+    // A static (locked) point is inert: grabbing it behaves exactly like
+    // grabbing its nearest non-static ancestor. For 0 -> a -> b with b static,
+    // dragging b must rotate a instead (as if a were dragged), and if a is
+    // static too it keeps climbing towards the root.
+    if (widget.controller.isPointStatic(ptHit)) {
+      var grab = ptHit;
+      while (widget.controller.isPointStatic(grab)) {
+        if (grab == subRoot) {
+          // Every ancestor up to the root is static: nothing may rotate.
+          widget.controller.forceUpdate();
+          return false;
+        }
+        grab = parent[grab]!;
+      }
+      final remapped = _segmentTouching(fig, grab);
+      widget.controller.setSelectedPoint(grab);
+      widget.controller.setSelectedSegment(remapped?.id);
+      seg = remapped;
+      ptHit = grab;
+    }
+
+    // DFS to find the local cycle loop that contains the (possibly remapped)
+    // grabbed point.
     final localCycleNodes = <int>{};
     final path = <int>[];
     final visitedDFS = <int>{};
@@ -196,22 +234,6 @@ extension _TransformTools on _FigureCanvasState {
     findCycle(ptHit, -1);
 
     final isCycle = localCycleNodes.isNotEmpty;
-
-    // Spanning tree from subRoot to know depths and parents
-    final parent = <int, int>{};
-    final depth = <int, int>{subRoot: 0};
-    final queue = <int>[subRoot];
-    final visitedBFS = <int>{subRoot};
-    while (queue.isNotEmpty) {
-      final cur = queue.removeAt(0);
-      for (final other in adj[cur]!) {
-        if (visitedBFS.contains(other)) continue;
-        visitedBFS.add(other);
-        parent[other] = cur;
-        depth[other] = depth[cur]! + 1;
-        queue.add(other);
-      }
-    }
 
     int centre;
     List<int> rotPts;

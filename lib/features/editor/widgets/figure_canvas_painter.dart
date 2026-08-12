@@ -235,7 +235,7 @@ class FigureCanvasPainter extends CustomPainter {
         if (seg.hidden) continue;
         if (seg.type == 'image' || seg.isNone) continue;
         if (c.isAnimateMode &&
-            !_visibleAt(fig, seg.point1Index, t)) {
+            !_visibleAtSeg(fig, seg, t)) {
           continue;
         }
         if (seg.point1Index >= pts.length || seg.point2Index >= pts.length) {
@@ -243,7 +243,7 @@ class FigureCanvasPainter extends CustomPainter {
         }
         final p1 = pts[seg.point1Index];
         final p2 = pts[seg.point2Index];
-        final overColor = _colorOverrideAt(fig, seg.point1Index, t);
+        final overColor = _colorOverrideAtSeg(fig, seg, t);
         final strokeColor =
             (parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB))
                 .withValues(alpha: alpha);
@@ -480,7 +480,7 @@ class FigureCanvasPainter extends CustomPainter {
     final sorted = fig.segmentsInDrawOrder();
     for (final seg in sorted) {
       if (seg.hidden || seg.isNone) continue;
-      if (c.isAnimateMode && !_visibleAt(fig, seg.point1Index, c.currentTime)) {
+      if (c.isAnimateMode && !_visibleAtSeg(fig, seg, c.currentTime)) {
         continue;
       }
       if (seg.point1Index >= fig.points.length ||
@@ -490,9 +490,9 @@ class FigureCanvasPainter extends CustomPainter {
       final p1 = fig.points[seg.point1Index];
       final p2 = fig.points[seg.point2Index];
 
-      final opacity = _opacityAt(fig, seg.point1Index, c.currentTime);
+      final opacity = _opacityAtSeg(fig, seg, c.currentTime);
 
-      final overColor = _colorOverrideAt(fig, seg.point1Index, c.currentTime);
+      final overColor = _colorOverrideAtSeg(fig, seg, c.currentTime);
 
       if (seg.type == 'line') {
         final baseColor = parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
@@ -646,7 +646,7 @@ class FigureCanvasPainter extends CustomPainter {
     if (c.isPlaying) return;
     for (final seg in fig.segments) {
       if (!seg.curved || seg.controlDX == null) continue;
-      if (c.isAnimateMode && !_visibleAt(fig, seg.point1Index, c.currentTime)) {
+      if (c.isAnimateMode && !_visibleAtSeg(fig, seg, c.currentTime)) {
         continue;
       }
       if (seg.point1Index >= fig.points.length ||
@@ -729,93 +729,32 @@ class FigureCanvasPainter extends CustomPainter {
 
   bool _visibleAt(Figure f, int pointIdx, double t) {
     if (pointIdx < 0 || pointIdx >= f.points.length) return true;
-    final roots = f.rootIndices.isNotEmpty ? f.rootIndices : [0];
-    var root = roots.first;
-    outer:
-    for (final r in roots) {
-      final visited = <int>{r};
-      final queue = <int>[r];
-      while (queue.isNotEmpty) {
-        final idx = queue.removeAt(0);
-        if (idx == pointIdx) {
-          root = r;
-          break outer;
-        }
-        for (final s in f.segments) {
-          final other = s.point1Index == idx
-              ? s.point2Index
-              : s.point2Index == idx
-                  ? s.point1Index
-                  : -1;
-          if (other >= 0 && !visited.contains(other)) {
-            visited.add(other);
-            queue.add(other);
-          }
-        }
-      }
-    }
-    return f.getFigureVisibility(root, t);
+    return f.getFigureVisibility(f.figureKeyFor(pointIdx), t);
   }
 
-  double _opacityAt(Figure f, int pointIdx, double t) {
-    if (pointIdx < 0 || pointIdx >= f.points.length) return 1.0;
-    final roots = f.rootIndices.isNotEmpty ? f.rootIndices : [0];
-    var root = roots.first;
-    outer:
-    for (final r in roots) {
-      final visited = <int>{r};
-      final queue = <int>[r];
-      while (queue.isNotEmpty) {
-        final idx = queue.removeAt(0);
-        if (idx == pointIdx) {
-          root = r;
-          break outer;
-        }
-        for (final s in f.segments) {
-          final other = s.point1Index == idx
-              ? s.point2Index
-              : s.point2Index == idx
-                  ? s.point1Index
-                  : -1;
-          if (other >= 0 && !visited.contains(other)) {
-            visited.add(other);
-            queue.add(other);
-          }
-        }
-      }
-    }
-    return f.getFigureOpacity(root, t);
+  bool _visibleAtSeg(Figure f, Segment seg, double t) {
+    final k = f.segmentFigureKey(seg);
+    if (k < 0) return true;
+    return f.getFigureVisibility(k, t);
+  }
+
+  double _opacityAtSeg(Figure f, Segment seg, double t) {
+    final k = f.segmentFigureKey(seg);
+    if (k < 0) return 1.0;
+    return f.getFigureOpacity(k, t);
   }
 
   String? _colorOverrideAt(Figure f, int pointIdx, double t) {
     if (!c.isAnimateMode) return null;
     if (pointIdx < 0 || pointIdx >= f.points.length) return null;
-    final roots = f.rootIndices.isNotEmpty ? f.rootIndices : [0];
-    var root = roots.first;
-    outer:
-    for (final r in roots) {
-      final visited = <int>{r};
-      final queue = <int>[r];
-      while (queue.isNotEmpty) {
-        final idx = queue.removeAt(0);
-        if (idx == pointIdx) {
-          root = r;
-          break outer;
-        }
-        for (final s in f.segments) {
-          final other = s.point1Index == idx
-              ? s.point2Index
-              : s.point2Index == idx
-                  ? s.point1Index
-                  : -1;
-          if (other >= 0 && !visited.contains(other)) {
-            visited.add(other);
-            queue.add(other);
-          }
-        }
-      }
-    }
-    return f.getFigureColorOverride(root, t);
+    return f.getFigureColorOverride(f.figureKeyFor(pointIdx), t);
+  }
+
+  String? _colorOverrideAtSeg(Figure f, Segment seg, double t) {
+    if (!c.isAnimateMode) return null;
+    final k = f.segmentFigureKey(seg);
+    if (k < 0) return null;
+    return f.getFigureColorOverride(k, t);
   }
 
   @override

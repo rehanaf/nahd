@@ -63,24 +63,25 @@ class PredefinedProjects {
   static const String bounceAnimationJson = '''
 {
   "name": "Bounce",
-  "duration": 1,
+  "timeUnit": "frame",
+  "duration": 12,
   "tracks": [
     {
       "pointIndex": 0,
       "keyframes": [
         { "time": 0, "x": 0, "y": -70 },
-        { "time": 0.33, "x": -120, "y": -70 },
-        { "time": 0.66, "x": 120, "y": -70 },
-        { "time": 1, "x": 0, "y": -70 }
+        { "time": 4, "x": -120, "y": -70 },
+        { "time": 8, "x": 120, "y": -70 },
+        { "time": 12, "x": 0, "y": -70 }
       ]
     },
     {
       "pointIndex": 1,
       "keyframes": [
         { "time": 0, "x": 0, "y": 50 },
-        { "time": 0.33, "x": -120, "y": 50 },
-        { "time": 0.66, "x": 120, "y": 50 },
-        { "time": 1, "x": 0, "y": 50 }
+        { "time": 4, "x": -120, "y": 50 },
+        { "time": 8, "x": 120, "y": 50 },
+        { "time": 12, "x": 0, "y": 50 }
       ]
     }
   ]

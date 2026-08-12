@@ -326,29 +326,10 @@ class _SegmentInspectorState extends State<SegmentInspector> {
     }
   }
 
-  int _rootOfPoint(Figure fig, int pointIdx) {
-    final roots = fig.getFigureRoots();
-    for (final r in roots) {
-      if (r == pointIdx) return r;
-      final visited = <int>{r};
-      final queue = <int>[r];
-      while (queue.isNotEmpty) {
-        final idx = queue.removeAt(0);
-        if (idx == pointIdx) return r;
-        for (final s in fig.segments) {
-          final other = s.point1Index == idx
-              ? s.point2Index
-              : s.point2Index == idx
-                  ? s.point1Index
-                  : -1;
-          if (other >= 0 && !visited.contains(other)) {
-            visited.add(other);
-            queue.add(other);
-          }
-        }
-      }
-    }
-    return roots.isEmpty ? 0 : roots.first;
+  int _rootOfSegment(Figure fig, Segment seg) {
+    if (seg.point1Index < 0 || seg.point1Index >= fig.points.length) return -1;
+    if (seg.point2Index < 0 || seg.point2Index >= fig.points.length) return -1;
+    return fig.segmentFigureKey(seg);
   }
 
   @override
@@ -413,7 +394,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
         );
 
     final roots = figure.getFigureRoots();
-    final figRoot = _rootOfPoint(figure, seg.point1Index);
+    final figRoot = _rootOfSegment(figure, seg);
     final figIndex = roots.indexOf(figRoot);
     final figVisibleNow = figure.getFigureVisibility(figRoot, c.currentTime);
     final figKfCount = figure.getFigureVisibilityKeyframes(figRoot).length;

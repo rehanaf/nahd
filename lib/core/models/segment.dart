@@ -39,17 +39,20 @@ class Point2 {
   double x;
   double y;
   bool isAttached;
+  bool isStatic;
 
-  Point2([this.x = 0, this.y = 0, this.isAttached = false]);
+  Point2([this.x = 0, this.y = 0, this.isAttached = false, this.isStatic = false]);
 
   Point2.fromJson(Map<String, dynamic> json)
       : x = (json['x'] as num?)?.toDouble() ?? 0,
         y = (json['y'] as num?)?.toDouble() ?? 0,
-        isAttached = json['isAttached'] as bool? ?? false;
+        isAttached = json['isAttached'] as bool? ?? false,
+        isStatic = json['static'] as bool? ?? false;
 
-  Map<String, dynamic> toJson() => {'x': x, 'y': y, 'isAttached': isAttached};
+  Map<String, dynamic> toJson() =>
+      {'x': x, 'y': y, 'isAttached': isAttached, 'static': isStatic};
 
-  Point2 clone() => Point2(x, y, isAttached);
+  Point2 clone() => Point2(x, y, isAttached, isStatic);
 
   @override
   String toString() => '($x, $y)';

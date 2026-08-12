@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../core/models/figure.dart';
+import '../../../core/models/segment.dart';
 
 Color? _parseHex(String? hex) {
   if (hex == null || hex.isEmpty) return null;
@@ -68,6 +69,7 @@ class FigurePreviewPainter extends CustomPainter {
     );
 
     final sorted = fig.segmentsInDrawOrder();
+    _paintPreviewFills(canvas, fig);
     for (final seg in sorted) {
       if (seg.hidden || seg.type == 'image' || seg.isNone) continue;
       if (seg.point1Index >= fig.points.length ||
@@ -76,6 +78,11 @@ class FigurePreviewPainter extends CustomPainter {
       }
       final p1 = fig.points[seg.point1Index];
       final p2 = fig.points[seg.point2Index];
+
+      // Figure-wide colour override (default keyframe) applies on top of the
+      // segment's own colour, using the same per-figure scoping as the editor.
+      final overColor = fig.getFigureColorOverride(fig.segmentFigureKey(seg), 0);
+      final baseColor = _parseHex(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
 
       if (seg.type == 'circle') {
         final mx = (p1.x + p2.x) / 2;
@@ -91,7 +98,8 @@ class FigurePreviewPainter extends CustomPainter {
             Offset(mx, my),
             r,
             Paint()
-              ..color = _parseHex(seg.fillColor) ??
+              ..color = _parseHex(overColor) ??
+                  _parseHex(seg.fillColor) ??
                   _parseHex(seg.color) ??
                   const Color(0xFFD1D5DB),
           );
@@ -100,7 +108,7 @@ class FigurePreviewPainter extends CustomPainter {
           Offset(mx, my),
           r,
           Paint()
-            ..color = _parseHex(seg.color) ?? const Color(0xFFD1D5DB)
+            ..color = baseColor
             ..style = PaintingStyle.stroke
             ..strokeWidth = seg.width <= 0 ? 3 : seg.width,
         );
@@ -108,7 +116,7 @@ class FigurePreviewPainter extends CustomPainter {
       }
 
       final paint = Paint()
-        ..color = _parseHex(seg.color) ?? const Color(0xFFD1D5DB)
+        ..color = baseColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = seg.width <= 0 ? 3 : seg.width;
       final path = Path()..moveTo(p1.x, p1.y);
@@ -129,6 +137,174 @@ class FigurePreviewPainter extends CustomPainter {
     }
 
     canvas.restore();
+  }
+
+  /// Recreates the editor's cycle-fill computation (per-connected-component
+  /// loop detection) so filled regions appear in the preview with their figure
+  /// colour override applied at the default keyframe.
+  void _paintPreviewFills(Canvas canvas, Figure fig) {
+    if (fig.segments.isEmpty) return;
+    final adj = <int, List<int>>{};
+    for (var i = 0; i < fig.points.length; i++) {
+      adj[i] = [];
+    }
+    for (final s in fig.segments) {
+      if (s.hidden || s.isNone) continue;
+      if (s.point1Index >= 0 &&
+          s.point1Index < fig.points.length &&
+          s.point2Index >= 0 &&
+          s.point2Index < fig.points.length) {
+        adj[s.point1Index]!.add(s.point2Index);
+        adj[s.point2Index]!.add(s.point1Index);
+      }
+    }
+
+    final visitedPts = <int>{};
+    final cf = fig.cycleFills;
+
+    Color? fillColorFor(String? stored, int point) {
+      final overColor = fig.getFigureColorOverride(fig.figureKeyFor(point), 0);
+      return _parseHex(overColor) ?? _parseHex(stored) ?? const Color(0xFFD1D5DB);
+    }
+
+    void drawCycle(List<int> pts, String? storedColor, int point) {
+      if (pts.length < 3) return;
+      final path = _previewCyclePath(fig, pts);
+      canvas.drawPath(
+        path,
+        Paint()..color = fillColorFor(storedColor, point)!,
+      );
+    }
+
+    for (var start = 0; start < fig.points.length; start++) {
+      if (visitedPts.contains(start)) continue;
+      final compPts = <int>{};
+      final q = <int>[start];
+      while (q.isNotEmpty) {
+        final idx = q.removeAt(0);
+        if (visitedPts.contains(idx)) continue;
+        visitedPts.add(idx);
+        compPts.add(idx);
+        for (final nb in adj[idx]!) {
+          if (!visitedPts.contains(nb)) q.add(nb);
+        }
+      }
+      if (compPts.length < 3) continue;
+
+      final deg = <int, int>{};
+      final nonCyclePoints = <int>[];
+      for (final pi in compPts) {
+        deg[pi] = adj[pi]!.length;
+        if (adj[pi]!.length != 2) nonCyclePoints.add(pi);
+      }
+
+      if (nonCyclePoints.isEmpty) {
+        final arr = compPts.toList();
+        var cur = arr[0];
+        var prev = -1;
+        final ordered = <int>[cur];
+        for (var i = 0; i < compPts.length; i++) {
+          int? nb;
+          for (final n in adj[cur]!) {
+            if (compPts.contains(n) && n != prev) {
+              nb = n;
+              break;
+            }
+          }
+          if (nb == null) break;
+          prev = cur;
+          cur = nb;
+          ordered.add(cur);
+        }
+        if (ordered.length >= 3 && ordered.first == ordered.last) {
+          final pts = ordered.sublist(0, ordered.length - 1);
+          final sortedPts = [...pts]..sort();
+          final stored = cf[sortedPts.join(',')];
+          drawCycle(pts, stored?.fillColor, pts.first);
+        }
+        continue;
+      }
+
+      final leafQ = nonCyclePoints.where((pi) => deg[pi] == 1).toList();
+      while (leafQ.isNotEmpty) {
+        final leaf = leafQ.removeAt(0);
+        compPts.remove(leaf);
+        for (final nb in adj[leaf]!) {
+          if (compPts.contains(nb)) {
+            deg[nb] = deg[nb]! - 1;
+            if (deg[nb] == 1) leafQ.add(nb);
+          }
+        }
+      }
+      if (compPts.length < 3) continue;
+
+      final remaining = compPts.toList();
+      final foundKeys = <String>{};
+      for (final seed in remaining) {
+        final stack = <({int pt, int prev, List<int> path})>[
+          (pt: seed, prev: -1, path: [seed])
+        ];
+        while (stack.isNotEmpty) {
+          final cur = stack.removeLast();
+          for (final nb in adj[cur.pt]!) {
+            if (!compPts.contains(nb) || nb == cur.prev) continue;
+            if (nb == seed && cur.path.length >= 3) {
+              final keySet = {...cur.path, seed}.toList()..sort();
+              final key = keySet.join(',');
+              if (!foundKeys.contains(key)) {
+                foundKeys.add(key);
+                final entry = cf[key];
+                if (entry == null || entry.filled) {
+                  drawCycle(
+                    [...cur.path, seed],
+                    entry?.fillColor,
+                    seed,
+                  );
+                }
+              }
+              continue;
+            }
+            if (!cur.path.contains(nb)) {
+              stack.add((pt: nb, prev: cur.pt, path: [...cur.path, nb]));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Path _previewCyclePath(Figure fig, List<int> pts) {
+    final path = Path();
+    if (pts.isEmpty) return path;
+    path.moveTo(fig.points[pts[0]].x, fig.points[pts[0]].y);
+    for (var j = 0; j < pts.length; j++) {
+      final next = (j + 1) % pts.length;
+      final seg = _previewSegmentBetween(fig, pts[j], pts[next]);
+      if (seg != null && seg.curved && seg.controlDX != null && seg.controlDY != null) {
+        final mx = (fig.points[pts[j]].x + fig.points[pts[next]].x) / 2;
+        final my = (fig.points[pts[j]].y + fig.points[pts[next]].y) / 2;
+        path.quadraticBezierTo(
+          mx + seg.controlDX!,
+          my + seg.controlDY!,
+          fig.points[pts[next]].x,
+          fig.points[pts[next]].y,
+        );
+      } else {
+        path.lineTo(fig.points[pts[next]].x, fig.points[pts[next]].y);
+      }
+    }
+    path.close();
+    return path;
+  }
+
+  Segment? _previewSegmentBetween(Figure fig, int a, int b) {
+    for (final s in fig.segments) {
+      if ((s.point1Index == a && s.point2Index == b) ||
+          (s.point1Index == b && s.point2Index == a)) {
+        return s;
+      }
+    }
+    return null;
   }
 
   @override
