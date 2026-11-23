@@ -161,6 +161,7 @@ class Figure {
   Map<String, List<OpacityKeyframe>> opacity;
   Map<String, List<FigureColorKeyframe>> colors;
   Map<String, List<SegmentImageKeyframe>> segmentImages;
+  Map<String, bool> figureCollision; // per-figure game-dev flag, key = figureKeyFor(root)
   List<LayerGroup> groups;
 
   static const String defaultGroupId = 'layer_default';
@@ -179,6 +180,7 @@ class Figure {
         opacity = {},
         colors = {},
         segmentImages = {},
+        figureCollision = {},
         groups = [LayerGroup(id: defaultGroupId, name: 'Default')];
 
   int addPoint(double x, double y) {
@@ -385,6 +387,18 @@ class Figure {
   List<VisibilityKeyframe> getFigureVisibilityKeyframes(int root) =>
       visibility[root.toString()] ?? [];
 
+  /// Game-dev collision flag for the whole figure identified by [root].
+  bool getFigureCollision(int root) => figureCollision[root.toString()] ?? false;
+
+  void setFigureCollision(int root, bool value) {
+    final key = root.toString();
+    if (value) {
+      figureCollision[key] = true;
+    } else {
+      figureCollision.remove(key);
+    }
+  }
+
   void setFigureOpacity(int root, double time, double val) {
     final key = root.toString();
     final track = opacity.putIfAbsent(key, () => []);
@@ -583,6 +597,15 @@ class Figure {
       });
       cycleFills = newCF;
     }
+    if (figureCollision.isNotEmpty) {
+      final newFC = <String, bool>{};
+      figureCollision.forEach((k, v) {
+        final rk = int.tryParse(k);
+        if (rk == null || removedSet.contains(rk)) return;
+        newFC[remap(rk).toString()] = v;
+      });
+      figureCollision = newFC;
+    }
     return removed;
   }
 
@@ -619,24 +642,41 @@ class Figure {
           : movedFigureRoot;
       rootIndices.remove(remappedRoot);
     }
-    if (visibility.isNotEmpty) {
-      final newVis = <String, List<VisibilityKeyframe>>{};
-      visibility.forEach((k, v) {
-        final rk = int.tryParse(k);
-        if (rk == null || rk == movedIdx) return;
-        newVis[(rk > movedIdx ? rk - 1 : rk).toString()] = v;
-      });
-      visibility = newVis;
+    // Re-key figure-scoped overrides: keys that reference a point inside the
+    // moved component follow that figure to its new per-figure key (so colour,
+    // visibility, opacity and collision survive attach/join). The dragged point
+    // itself ([movedIdx]) is removed, but overrides keyed to it must follow the
+    // moved figure too (this is the root pivot of an attached figure). Keys of
+    // other figures are just renumbered past the removed point.
+    String? joinKey(String k) {
+      final rk = int.tryParse(k);
+      if (rk == null) return null;
+      if (movedComp.contains(rk)) {
+        if (rk != movedIdx) {
+          final renum = rk > movedIdx ? rk - 1 : rk;
+          if (renum < 0 || renum >= points.length) return null;
+          final fk = figureKeyFor(renum);
+          if (fk < 0) return null;
+          return fk.toString();
+        }
+        // rk == movedIdx: the dragged (removed) point. Resolve the moved
+        // figure's new key via any surviving point of the moved component.
+        for (final p in movedComp) {
+          if (p == movedIdx) continue;
+          final renum = p > movedIdx ? p - 1 : p;
+          if (renum >= 0 && renum < points.length) {
+            final fk = figureKeyFor(renum);
+            if (fk >= 0) return fk.toString();
+          }
+        }
+        return null;
+      }
+      final renum = rk > movedIdx ? rk - 1 : rk;
+      if (renum < 0 || renum >= points.length) return null;
+      return renum.toString();
     }
-    if (opacity.isNotEmpty) {
-      final newOp = <String, List<OpacityKeyframe>>{};
-      opacity.forEach((k, v) {
-        final rk = int.tryParse(k);
-        if (rk == null || rk == movedIdx) return;
-        newOp[(rk > movedIdx ? rk - 1 : rk).toString()] = v;
-      });
-      opacity = newOp;
-    }
+
+    _rekeyFigureOverrides(joinKey);
     if (cycleFills.isNotEmpty) {
       final newCF = <String, CycleFill>{};
       cycleFills.forEach((key, entry) {
@@ -648,6 +688,59 @@ class Figure {
     }
     repairRoots();
     return newTarget;
+  }
+
+  /// Re-keys every figure-scoped override map ([colors], [visibility],
+  /// [opacity], [figureCollision]) using [newKeyFor]; entries whose key
+  /// resolves to null are dropped.
+  void _rekeyFigureOverrides(String? Function(String key) newKeyFor) {
+    if (visibility.isNotEmpty) {
+      final newVis = <String, List<VisibilityKeyframe>>{};
+      visibility.forEach((k, v) {
+        final nk = newKeyFor(k);
+        if (nk == null) return;
+        newVis.putIfAbsent(nk, () => []).addAll(v);
+      });
+      visibility = newVis;
+    }
+    if (opacity.isNotEmpty) {
+      final newOp = <String, List<OpacityKeyframe>>{};
+      opacity.forEach((k, v) {
+        final nk = newKeyFor(k);
+        if (nk == null) return;
+        newOp.putIfAbsent(nk, () => []).addAll(v);
+      });
+      opacity = newOp;
+    }
+    if (colors.isNotEmpty) {
+      final newColors = <String, List<FigureColorKeyframe>>{};
+      colors.forEach((k, v) {
+        final nk = newKeyFor(k);
+        if (nk == null) return;
+        newColors.putIfAbsent(nk, () => []).addAll(v);
+      });
+      colors = newColors;
+    }
+    if (figureCollision.isNotEmpty) {
+      final newFC = <String, bool>{};
+      figureCollision.forEach((k, v) {
+        final nk = newKeyFor(k);
+        if (nk == null) return;
+        newFC[nk] = v;
+      });
+      figureCollision = newFC;
+    }
+  }
+
+  /// Moves every figure-scoped override from [fromKey] to [toKey] (other keys
+  /// keep their values). Used when a figure gains a new root (e.g. detaching
+  /// an attached figure) so colour/visibility/opacity/collision survive.
+  void moveFigureOverrides(int fromKey, int toKey) {
+    _rekeyFigureOverrides((k) {
+      final rk = int.tryParse(k);
+      if (rk == null) return null;
+      return rk == fromKey ? toKey.toString() : k;
+    });
   }
 
   /// Splits a shared joint so [jointIdx] stops connecting to
@@ -666,6 +759,10 @@ class Figure {
         (s.point1Index == jointIdx && s.point2Index == detachFromIdx) ||
         (s.point1Index == detachFromIdx && s.point2Index == jointIdx));
     if (segIdx == -1) return -1;
+    // Remember the figure keys on both sides of the joint BEFORE splitting so
+    // overrides can follow the detached side to its new root.
+    final detachKey = figureKeyFor(detachFromIdx);
+    final jointKey = figureKeyFor(jointIdx);
     final newIdx = addPoint(copyX, copyY);
     final seg = segments[segIdx];
     if (seg.point1Index == jointIdx) {
@@ -675,6 +772,15 @@ class Figure {
     }
     if (!rootIndices.contains(newIdx)) rootIndices.add(newIdx);
     repairRoots();
+    // Only when the joint separated two figures does the detached side get its
+    // own figure key (newIdx); then its overrides move from the old key.
+    if (detachKey != jointKey && detachKey >= 0 && detachKey < points.length) {
+      _rekeyFigureOverrides((k) {
+        final rk = int.tryParse(k);
+        if (rk == null) return null;
+        return rk == detachKey ? newIdx.toString() : k;
+      });
+    }
     return newIdx;
   }
 
@@ -793,6 +899,7 @@ class Figure {
             (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
         'segmentImages': segmentImages.map(
             (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
+        'figureCollision': figureCollision,
         'groups': groups.map((g) => g.toJson()).toList(),
       };
 
@@ -919,6 +1026,13 @@ class Figure {
           .whereType<Map<String, dynamic>>()
           .map((g) => LayerGroup.fromJson(g))
           .toList();
+    }
+
+    final rawFigCollision = data['figureCollision'];
+    if (rawFigCollision is Map) {
+      rawFigCollision.forEach((k, v) {
+        if (v is bool) fig.figureCollision[k.toString()] = v;
+      });
     }
     if (legacySeconds) {
       // Pre-frame-unit save: keyframe times were stored in seconds. Convert to

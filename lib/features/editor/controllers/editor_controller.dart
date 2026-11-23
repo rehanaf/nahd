@@ -29,6 +29,7 @@ enum EditorTool {
   line,
   circle,
   image,
+  text,
   none,
   asset,
   join,
@@ -48,6 +49,7 @@ extension EditorToolX on EditorTool {
         EditorTool.line => 'Line',
         EditorTool.circle => 'Circle',
         EditorTool.image => 'Image',
+        EditorTool.text => 'Text',
         EditorTool.none => 'None',
         EditorTool.asset => 'Asset',
         EditorTool.join => 'Join',
@@ -83,6 +85,37 @@ class EditorController extends ChangeNotifier {
   String? selectedSegmentId;
   int? selectedPointIndex;
   final Map<int, String> pointModes = {}; // index -> 'dynamic' | 'static'
+
+  /// Points explicitly multi-selected (across figures). Any transform grabs a
+  /// selected point and applies to the whole set.
+  final Set<int> multiSelection = {};
+
+  /// Grid / point snapping toggled from the editor "More" menu.
+  bool _snapEnabled = false;
+  bool get snapEnabled => _snapEnabled;
+  double snapGrid = 20;
+
+  void setSnapEnabled(bool v) {
+    _snapEnabled = v;
+    notifyListeners();
+  }
+
+  void toggleSnap() => setSnapEnabled(!_snapEnabled);
+
+  void toggleMultiSelect(int index) {
+    if (index < 0 || index >= figure.points.length) return;
+    if (!multiSelection.add(index)) {
+      multiSelection.remove(index);
+    }
+    setSelectedPoint(index);
+    notifyListeners();
+  }
+
+  void clearMultiSelect() {
+    if (multiSelection.isEmpty) return;
+    multiSelection.clear();
+    notifyListeners();
+  }
 
   EditorMode editorMode;
   EditorTool activeTool = EditorTool.rotate;
@@ -352,6 +385,7 @@ class EditorController extends ChangeNotifier {
     });
     pointModes.clear();
     pointModes.addAll(remapped);
+    multiSelection.clear();
     if (currentAnimation != null) {
       currentAnimation!.tracks.removeWhere((t) => t.pointIndex == movedIdx);
       for (final t in currentAnimation!.tracks) {
@@ -574,6 +608,7 @@ class EditorController extends ChangeNotifier {
     pointModes.forEach((k, v) => remapped[remap(k)] = v);
     pointModes.clear();
     pointModes.addAll(remapped);
+    multiSelection.clear();
     _resetSelection();
     pushHistory();
     forceUpdate();
@@ -633,6 +668,34 @@ class EditorController extends ChangeNotifier {
   int _figureKeyForPoint(int ptIdx) {
     if (ptIdx < 0 || ptIdx >= figure.points.length) return -1;
     return figure.figureKeyFor(ptIdx);
+  }
+
+  /// Returns a point index that belongs to the currently-selected figure,
+  /// honouring attached joints. For a selected segment whose endpoint is the
+  /// attached joint (that endpoint maps to the HOST figure), the endpoint on
+  /// the attachment side is returned so figure-scoped overrides
+  /// (colour/visibility/opacity/collision) target the right figure.
+  int? selectedFigurePoint() {
+    if (_figure == null) return null;
+    final segId = selectedSegmentId;
+    if (segId != null) {
+      final seg = figure.getSegment(segId);
+      if (seg != null) {
+        final k = figure.segmentFigureKey(seg);
+        for (final idx in [seg.point1Index, seg.point2Index]) {
+          if (idx >= 0 &&
+              idx < figure.points.length &&
+              figure.figureKeyFor(idx) == k) {
+            return idx;
+          }
+        }
+        if (k >= 0 && k < figure.points.length) return k;
+        return null;
+      }
+    }
+    final pt = selectedPointIndex;
+    if (pt != null && pt >= 0 && pt < figure.points.length) return pt;
+    return null;
   }
 
   void setFigureColorOverride(int ptIdx, String color) {
@@ -727,6 +790,45 @@ class EditorController extends ChangeNotifier {
     figure.setSegmentImageIndex(segId, currentTime, imageIndex);
     pushHistory();
     forceUpdate();
+  }
+
+  /// Swaps the currently-active image of a segment with [data] (a data URI)
+  /// without touching the rig (points/connections stay intact). Works in both
+  /// figure and preset/animate modes.
+  void swapSegmentImage(String segId, String data) {
+    if (_figure == null) return;
+    final seg = figure.getSegment(segId);
+    if (seg == null) return;
+    final idx = isAnimateMode
+        ? (figure.getSegmentImageIndex(segId, currentTime) ??
+            seg.activeImageIndex)
+        : seg.activeImageIndex;
+    if (seg.imageDataList.isEmpty) {
+      seg.imageDataList.add(data);
+    } else {
+      seg.imageDataList[idx.clamp(0, seg.imageDataList.length - 1)] = data;
+    }
+    seg.activeImageIndex = idx.clamp(0, seg.imageDataList.length - 1);
+    pushHistory();
+    forceUpdate();
+  }
+
+  /// Toggles the game-dev collision flag for the whole figure containing
+  /// [ptIdx] (scoped per figure, following the visibility/opacity pattern).
+  void toggleFigureCollision(int ptIdx) {
+    if (_figure == null) return;
+    final root = _figureKeyForPoint(ptIdx);
+    if (root == -1) return;
+    figure.setFigureCollision(root, !figure.getFigureCollision(root));
+    pushHistory();
+    forceUpdate();
+  }
+
+  bool isFigureCollision(int ptIdx) {
+    if (_figure == null) return false;
+    final root = _figureKeyForPoint(ptIdx);
+    if (root == -1) return false;
+    return figure.getFigureCollision(root);
   }
 
   // -------------------------------------------------------------------------

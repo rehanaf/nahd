@@ -46,12 +46,23 @@ class AnimationTransport extends StatelessWidget {
             icon: Icons.skip_previous,
             onTap: goPrev,
           ),
-          Text(
-            '${currentFrame + 1} / $totalFrames',
-            style: TextStyle(
-              color: palette.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          // Fixed-size slot: keeps the transport capsule from resizing when
+          // the frame number gains/loses digits (e.g. 9/10 -> 10/100).
+          SizedBox(
+            width: 72,
+            height: 32,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${currentFrame + 1} / $totalFrames',
+                textAlign: TextAlign.center,
+                softWrap: false,
+                style: TextStyle(
+                  color: palette.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
           EditorIconButton(

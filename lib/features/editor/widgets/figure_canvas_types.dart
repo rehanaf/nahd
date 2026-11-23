@@ -44,6 +44,8 @@ class _DragState {
   double assetCenterX = 0;
   double assetCenterY = 0;
   bool jointDone = false;
+  bool maybeTap = false;
+  bool tapWasSelected = false;
   final Map<String, Point2> anchorImgCenter = {};
   final Map<String, double> anchorImgRot = {};
   final Map<String, _SegInitial> initSegs = {};
@@ -67,6 +69,8 @@ class _DragState {
     assetOp = '';
     assetHandle = -1;
     jointDone = false;
+    maybeTap = false;
+    tapWasSelected = false;
     startX = 0;
     startY = 0;
     startPtX = 0;

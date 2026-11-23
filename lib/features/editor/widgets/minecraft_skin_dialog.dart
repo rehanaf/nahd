@@ -8,11 +8,9 @@ import '../../../core/theme/app_theme.dart';
 
 /// Settings chosen in the Minecraft skin import dialog.
 class McSkinSettings {
-  final double scale;
   final double yawDeg;
   final bool includeOuter;
   const McSkinSettings({
-    required this.scale,
     required this.yawDeg,
     required this.includeOuter,
   });
@@ -30,7 +28,6 @@ class MinecraftSkinDialog extends StatefulWidget {
 }
 
 class _MinecraftSkinDialogState extends State<MinecraftSkinDialog> {
-  double _scale = 8;
   double _yawDeg = 0;
   bool _includeOuter = true;
 
@@ -41,18 +38,32 @@ class _MinecraftSkinDialogState extends State<MinecraftSkinDialog> {
     final palette = Theme.of(context).appColors;
     final title = 'Import Minecraft Skin';
 
+    // Bound the dialog height to the available screen (accounting for the
+    // dialog insets + our own margins) so the bottom controls (Cancel/Import)
+    // are never clipped on small/landscape mobile screens. Content scrolls
+    // when it does not fit.
+    final media = MediaQuery.of(context);
+    final maxH = math.max(
+      240.0,
+      media.size.height - media.padding.top - media.padding.bottom - 80,
+    );
+
     return Material(
       color: Colors.transparent,
       child: Container(
         margin: const EdgeInsets.all(16),
         padding: const EdgeInsets.all(16),
-        constraints: BoxConstraints(maxWidth: 360),
+        constraints: BoxConstraints(
+          maxWidth: 360,
+          maxHeight: maxH,
+        ),
         decoration: BoxDecoration(
           color: palette.backgroundElement,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: palette.backgroundSelected),
         ),
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -73,24 +84,12 @@ class _MinecraftSkinDialogState extends State<MinecraftSkinDialog> {
               child: CustomPaint(
                 painter: McSkinPreviewPainter(
                   skin: widget.skin,
-                  scale: _scale,
                   yawDeg: _yawDeg,
                   includeOuter: _includeOuter,
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            Text('Scale: ${_scale.round()}',
-                style: TextStyle(color: palette.text, fontSize: 12)),
-            Slider(
-              value: _scale,
-              min: 2,
-              max: 20,
-              divisions: 18,
-              activeColor: const Color(0xFF10B981),
-              inactiveColor: palette.backgroundSelected,
-              onChanged: (v) => setState(() => _scale = v),
-            ),
             Text('Yaw (side): ${_yawDeg.round()}°',
                 style: TextStyle(color: palette.text, fontSize: 12)),
             Slider(
@@ -122,7 +121,6 @@ class _MinecraftSkinDialogState extends State<MinecraftSkinDialog> {
                 const SizedBox(width: 8),
                 FilledButton(
                   onPressed: () => _pop(McSkinSettings(
-                    scale: _scale,
                     yawDeg: _yawDeg,
                     includeOuter: _includeOuter,
                   )),
@@ -135,6 +133,7 @@ class _MinecraftSkinDialogState extends State<MinecraftSkinDialog> {
               ],
             ),
           ],
+          ),
         ),
       ),
     );
@@ -142,16 +141,16 @@ class _MinecraftSkinDialogState extends State<MinecraftSkinDialog> {
 }
 
 /// Draws the full projected character for the live preview, using the same
-/// projection math as [buildMinecraftSkinFigure].
+/// projection math as [buildMinecraftSkinFigure]. Preview renders at the fixed
+/// import scale (8 world units per skin pixel).
 class McSkinPreviewPainter extends CustomPainter {
+  static const double scale = 8;
   final ui.Image skin;
-  final double scale;
   final double yawDeg;
   final bool includeOuter;
 
   McSkinPreviewPainter({
     required this.skin,
-    required this.scale,
     required this.yawDeg,
     required this.includeOuter,
   });
@@ -187,9 +186,10 @@ class McSkinPreviewPainter extends CustomPainter {
         final w = face.screenW * scale;
         if (w < 0.5) continue;
         final dst = ui.Rect.fromLTWH(x, topY, w, h);
-        _drawUv(canvas, skin, face.baseUv, dst, paint);
+        final flip = mcSideFace(face.side);
+        _drawUv(canvas, skin, face.baseUv, dst, paint, flip: flip);
         if (includeOuter && face.outerUv != null) {
-          _drawUv(canvas, skin, face.outerUv!, dst, paint);
+          _drawUv(canvas, skin, face.outerUv!, dst, paint, flip: flip);
         }
         x += w;
       }
@@ -197,16 +197,25 @@ class McSkinPreviewPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawUv(Canvas canvas, ui.Image img, McUv uv, ui.Rect dst, ui.Paint p) {
+  void _drawUv(Canvas canvas, ui.Image img, McUv uv, ui.Rect dst, ui.Paint p,
+      {bool flip = false}) {
     final src = ui.Rect.fromLTWH(
         uv.x.toDouble(), uv.y.toDouble(), uv.w.toDouble(), uv.h.toDouble());
+    if (!flip) {
+      canvas.drawImageRect(img, src, dst, p);
+      return;
+    }
+    canvas.save();
+    canvas.translate(dst.center.dx, dst.center.dy);
+    canvas.scale(-1, 1);
+    canvas.translate(-dst.center.dx, -dst.center.dy);
     canvas.drawImageRect(img, src, dst, p);
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(McSkinPreviewPainter oldDelegate) =>
       oldDelegate.skin != skin ||
-      oldDelegate.scale != scale ||
       oldDelegate.yawDeg != yawDeg ||
       oldDelegate.includeOuter != includeOuter;
 }

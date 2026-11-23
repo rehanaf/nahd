@@ -8,7 +8,12 @@ extension _PointModifyTool on _FigureCanvasState {
         widget.controller.setSelectedPoint(ptHit);
         final cs = _segmentTouching(fig, ptHit);
         widget.controller.setSelectedSegment(cs?.id);
-        final moving = <int>[ptHit, ...fig.childPoints(ptHit)];
+        // Multi-select: dragging one selected point moves the whole set; a
+        // single selection keeps the classic point+descendants behaviour.
+        final moving = widget.controller.multiSelection.length > 1 &&
+                widget.controller.multiSelection.contains(ptHit)
+            ? widget.controller.multiSelection.toList()
+            : <int>[ptHit, ...fig.childPoints(ptHit)];
         final init = <int, Point2>{};
         for (final i in moving) {
           init[i] = fig.points[i].clone();

@@ -5,8 +5,22 @@ extension _DrawTool on _FigureCanvasState {
     if (tool == EditorTool.line ||
         tool == EditorTool.circle ||
         tool == EditorTool.image ||
-        tool == EditorTool.none) {
+        tool == EditorTool.none ||
+        tool == EditorTool.text) {
       final ptHit = _hitTestPoint(w);
+      if (tool == EditorTool.text) {
+        final p1 = fig.addPoint(w.dx, w.dy);
+        final p2 = fig.addPoint(w.dx + 1, w.dy);
+        final seg = fig.createSegment('text', p1, p2);
+        _lastPt = p2;
+        seg.text = 'Text';
+        widget.controller.setSelectedSegment(seg.id);
+        widget.controller.setSelectedPoint(p1);
+        widget.controller.forceUpdate();
+        widget.controller.pushHistory();
+        _promptTextSegment(seg);
+        return;
+      }
       if (ptHit < 0) {
         if (fig.points.isEmpty) {
           final idx = fig.addPoint(w.dx, w.dy);
@@ -49,5 +63,82 @@ extension _DrawTool on _FigureCanvasState {
       widget.controller.forceUpdate();
       return;
     }
+  }
+
+  Future<void> _promptTextSegment(Segment seg) async {
+    final controller = TextEditingController(text: seg.text ?? '');
+    final sizeController =
+        TextEditingController(text: seg.textSize.toStringAsFixed(0));
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF17191E),
+        title: const Text('Text', style: TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Type something…',
+                  hintStyle: TextStyle(color: Colors.white38),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.lightBlueAccent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: sizeController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Size',
+                  labelStyle: TextStyle(color: Colors.white38),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.lightBlueAccent),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(ctx).pop('ok'),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (result == 'ok') {
+      final text = controller.text.trim();
+      seg.text = text.isEmpty ? 'Text' : text;
+      final size = double.tryParse(sizeController.text);
+      seg.textSize = (size == null || size <= 0) ? 32 : size;
+
+      // Keep the two text points so the label renders even before the next
+      // layout, and push a single undoable change.
+      seg.point1Index = seg.point1Index;
+      widget.controller.forceUpdate();
+      widget.controller.pushHistory();
+    }
+    controller.dispose();
+    sizeController.dispose();
   }
 }

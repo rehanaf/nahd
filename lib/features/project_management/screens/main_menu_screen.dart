@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/app_version.dart';
 import '../../../core/project_io.dart';
 import '../../../core/project_storage.dart';
 import '../../../core/scene/predefined_projects.dart';

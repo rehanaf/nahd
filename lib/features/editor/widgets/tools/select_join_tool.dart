@@ -21,8 +21,11 @@ extension _SelectJoinTool on _FigureCanvasState {
               .toList();
 
           // For each neighbor, BFS excluding the orange point to get the sub-tree.
-          // The attachment sub-tree has NO rootIndices in it.
-          Set<int>? attachComp;
+          // The attachment sub-tree has NO rootIndices in it. When the attached
+          // figure connects to the joint through several segments (a "middle"
+          // segment), every root-less sub-tree belongs to it, so we take the
+          // UNION of them all.
+          final attachComp = <int>{};
           int? firstAttachNeighbor;
           for (final s in touchingSegs) {
             final nb = s.point1Index == ptHit ? s.point2Index : s.point1Index;
@@ -45,15 +48,14 @@ extension _SelectJoinTool on _FigureCanvasState {
                 }
               }
             }
-            // If this sub-tree has no root, it's the attached figure.
+            // If this sub-tree has no root, it's part of the attached figure.
             if (!fig.rootIndices.any(comp.contains)) {
-              attachComp = comp;
-              firstAttachNeighbor = nb;
-              break;
+              attachComp.addAll(comp);
+              firstAttachNeighbor ??= nb;
             }
           }
 
-          if (attachComp != null && firstAttachNeighbor != null) {
+          if (attachComp.isNotEmpty && firstAttachNeighbor != null) {
             // Split ALL segments from ptHit that go into the attachment sub-tree.
             // We must redirect them to a new root point at the orange position.
             final newRootX = orangePt.x;
@@ -72,6 +74,10 @@ extension _SelectJoinTool on _FigureCanvasState {
             }
             fig.repairRoots();
             orangePt.isAttached = false;
+            // The detached sub-figure's overrides (colour, visibility, opacity,
+            // collision) were keyed to the attached joint; move them to the new
+            // root so they survive detaching.
+            fig.moveFigureOverrides(ptHit, newPtIdx);
             widget.controller.pushHistory();
             widget.controller.forceUpdate();
 
@@ -198,12 +204,27 @@ extension _SelectJoinTool on _FigureCanvasState {
     if (tool == EditorTool.select) {
       final ptHit = _hitTestPoint(w);
       if (ptHit >= 0) {
-        final allC = _findConnectedPoints(fig, ptHit)..add(ptHit);
+        final sel = widget.controller.multiSelection;
+        final already = sel.contains(ptHit);
+        if (already) {
+          _drag.maybeTap = true;
+          _drag.tapWasSelected = true;
+        } else {
+          sel.add(ptHit);
+          _drag.maybeTap = false;
+        }
         widget.controller.setSelectedPoint(ptHit);
         final cs = _segmentTouching(fig, ptHit);
         widget.controller.setSelectedSegment(cs?.id);
+        // Single isolated selection keeps the classic "Move All" behaviour
+        // (drag the whole connected figure); a multi-selection moves only the
+        // explicitly selected points.
+        final moving = sel.length > 1 ? sel.toList() : <int>[
+          ptHit,
+          ..._findConnectedPoints(fig, ptHit),
+        ];
         final init = <int, Point2>{};
-        for (final i in allC) {
+        for (final i in moving) {
           init[i] = fig.points[i].clone();
         }
         _drag
@@ -215,12 +236,13 @@ extension _SelectJoinTool on _FigureCanvasState {
           ..startY = w.dy
           ..startPtX = fig.points[ptHit].x
           ..startPtY = fig.points[ptHit].y
-          ..connPts = allC
+          ..connPts = moving
           ..fkInit = init;
         _captureAnchorForPoint(fig, ptHit, all: true);
         widget.controller.forceUpdate();
         return;
       }
+      widget.controller.clearMultiSelect();
       widget.controller.setSelectedPoint(null);
       final segHit = _hitTestSegment(w);
       widget.controller.setSelectedSegment(segHit);

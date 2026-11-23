@@ -36,7 +36,13 @@ extension EditorControllerSvgX on EditorController {
       }
       final settings = await showDialog<McSkinSettings>(
         context: context,
-        builder: (_) => MinecraftSkinDialog(skin: skin),
+        useSafeArea: true,
+        builder: (_) => DialogTheme(
+          data: DialogThemeData(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          ),
+          child: MinecraftSkinDialog(skin: skin),
+        ),
       );
       skin.dispose();
       codec.dispose();
@@ -44,7 +50,6 @@ extension EditorControllerSvgX on EditorController {
 
       final imported = await buildMinecraftSkinFigure(
         pngBytes,
-        scale: settings.scale,
         yawDeg: settings.yawDeg,
         includeOuter: settings.includeOuter,
       );

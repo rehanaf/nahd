@@ -282,6 +282,9 @@ class _SegmentInspectorState extends State<SegmentInspector> {
       case 'imageRotate':
         seg.imageRotate = (value as num).toDouble();
         break;
+      case 'isCollision':
+        seg.isCollision = value as bool;
+        break;
     }
     setState(() {});
     widget.controller.forceUpdate();
@@ -517,6 +520,24 @@ class _SegmentInspectorState extends State<SegmentInspector> {
           _Accordion(
             title: 'Segment Type',
             child: typePicker(['line', 'circle', 'image', 'none']),
+          ),
+
+          _Accordion(
+            title: 'Collision',
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Part ikut collision',
+                      style: TextStyle(
+                          color: palette.textSecondary, fontSize: 13)),
+                ),
+                Switch(
+                  value: seg.isCollision,
+                  onChanged: (v) => _change(seg, 'isCollision', v),
+                  activeTrackColor: const Color(0xFF22C55E),
+                ),
+              ],
+            ),
           ),
 
           _Accordion(

@@ -84,6 +84,30 @@ class FigurePreviewPainter extends CustomPainter {
       final overColor = fig.getFigureColorOverride(fig.segmentFigureKey(seg), 0);
       final baseColor = _parseHex(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
 
+      if (seg.type == 'text') {
+        final text = seg.text;
+        if (text != null && text.isNotEmpty) {
+          final tp = TextPainter(
+            text: TextSpan(
+              text: text,
+              style: TextStyle(
+                color: baseColor,
+                fontSize: seg.textSize <= 0 ? 32 : seg.textSize,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Inter',
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          canvas.save();
+          canvas.translate((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+          canvas.rotate(math.atan2(p2.y - p1.y, p2.x - p1.x));
+          tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+          canvas.restore();
+        }
+        continue;
+      }
+
       if (seg.type == 'circle') {
         final mx = (p1.x + p2.x) / 2;
         final my = (p1.y + p2.y) / 2;

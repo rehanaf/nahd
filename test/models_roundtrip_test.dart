@@ -67,6 +67,116 @@ void main() {
     expect(mid.y, 23.0);
   });
 
+  test('Segment JSON round-trip preserves collision flag', () {
+    final seg = Segment('image')
+      ..point1Index = 0
+      ..point2Index = 1
+      ..imageDataList = ['data:image/png;base64,AAAA']
+      ..isCollision = true;
+
+    final decoded = Segment.fromJson(seg.toJson());
+
+    expect(decoded.isCollision, isTrue);
+    expect(decoded.imageDataList, ['data:image/png;base64,AAAA']);
+    expect(decoded.point1Index, 0);
+    expect(decoded.point2Index, 1);
+
+    // Missing key defaults to false (backward compatible).
+    final legacy = Segment.fromJson(const {'type': 'line'});
+    expect(legacy.isCollision, isFalse);
+  });
+
+  test('Figure collision flag round-trips per figure', () {
+    final fig = Figure('Collide')
+      ..points.addAll([Point2(0, 0), Point2(40, 0)])
+      ..rootIndices.add(0);
+    fig.createSegment('line', 0, 1);
+    fig.setFigureCollision(0, true);
+
+    final decoded = Figure.fromJsonString(fig.exportToJson());
+
+    expect(decoded.getFigureCollision(0), isTrue);
+    expect(decoded.getFigureCollision(1), isFalse);
+
+    // Toggle off removes the entry.
+    decoded.setFigureCollision(0, false);
+    expect(decoded.getFigureCollision(0), isFalse);
+  });
+
+test('figure colour override survives attach (join) and re-keying', () {
+    final fig = Figure('AttachColor')
+      ..points.addAll([
+        Point2(0, 0), Point2(40, 0), // Figure A (root 0)
+        Point2(0, -40), Point2(40, -40), // Figure B (root 2)
+      ])
+      ..rootIndices.addAll([0, 2]);
+    fig.createSegment('line', 0, 1);
+    fig.createSegment('line', 2, 3);
+    fig.setFigureColorOverride(2, 0.5, '#00ff00');
+
+    // Attach B onto A: target point 1 becomes the attached joint first.
+    fig.points[1].isAttached = true;
+    final newTarget = fig.joinPoints(3, 1);
+
+    expect(newTarget, 1);
+    // B's points now resolve to the joint key (1); its colour must follow.
+    final bSide = fig.figureKeyFor(2);
+    expect(bSide, 1);
+    expect(fig.getFigureColorOverride(bSide, 0.5), '#00ff00');
+
+    // Detach: splitting at the joint boundary keeps the colour with B.
+    final newRoot = fig.splitJoint(1, 2, 40, -40);
+    expect(newRoot, greaterThan(2));
+    expect(fig.getFigureColorOverride(newRoot, 0.5), '#00ff00');
+  });
+
+  test('attach dragging the figure ROOT keeps overrides keyed to that root', () {
+    final fig = Figure('AttachRoot')
+      ..points.addAll([
+        Point2(0, 0), Point2(40, 0), // Figure A (root 0)
+        Point2(0, -40), Point2(40, -40), // Figure B (root 2)
+      ])
+      ..rootIndices.addAll([0, 2]);
+    fig.createSegment('line', 0, 1);
+    fig.createSegment('line', 2, 3);
+    // Colour/collision live on B's ROOT pivot (point 2).
+    fig.setFigureColorOverride(2, 0.5, '#0000ff');
+    fig.setFigureCollision(2, true);
+
+    // Attach by dragging B's root (the point the attach tool grabs) onto A's
+    // point 1. movedIdx == 2 == the override key.
+    fig.points[1].isAttached = true;
+    final newTarget = fig.joinPoints(2, 1);
+
+    expect(newTarget, 1);
+    // B's surviving point (old 3 -> new 2) resolves to the joint key.
+    expect(fig.figureKeyFor(2), 1);
+    expect(fig.getFigureColorOverride(1, 0.5), '#0000ff');
+    expect(fig.getFigureCollision(1), isTrue);
+    // A's own state untouched.
+    expect(fig.getFigureColorOverride(0, 0.5), isNull);
+  });
+
+  test('moveFigureOverrides keeps colour when a figure gains a new root', () {
+    final fig = Figure('Move')
+      ..points.addAll([Point2(0, 0), Point2(40, 0), Point2(0, -40)])
+      ..rootIndices.add(0);
+    fig.createSegment('line', 0, 1);
+    fig.createSegment('line', 1, 2);
+    // Simulate an attached figure keyed to joint point 1.
+    fig.points[1].isAttached = true;
+    fig.setFigureColorOverride(1, 0.5, '#ff8800');
+    fig.setFigureCollision(1, true);
+
+    final newRoot = fig.addPoint(0, -40);
+    fig.moveFigureOverrides(1, newRoot);
+
+    expect(fig.getFigureColorOverride(newRoot, 0.5), '#ff8800');
+    expect(fig.getFigureCollision(newRoot), isTrue);
+    // Root figure is untouched.
+    expect(fig.getFigureColorOverride(0, 0.5), isNull);
+  });
+
   test('hex color helpers', () {
     final c = parseHexColor('#d1d5db');
     expect(c, isNotNull);

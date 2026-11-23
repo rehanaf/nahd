@@ -106,7 +106,7 @@ ThemeData buildAppTheme(Brightness brightness) {
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: palette.background,
-    fontFamily: 'Onest',
+    fontFamily: 'Inter',
   );
 
   final textTheme = base.textTheme.apply(

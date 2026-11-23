@@ -66,11 +66,28 @@ class FigureCanvasPainter extends CustomPainter {
       canvas.drawLine(const Offset(-9999, 0), const Offset(9999, 0), axisPaint);
     }
 
+    if (c.snapEnabled) {
+      final g = c.snapGrid > 0 ? c.snapGrid : 20;
+      final gridPaint = Paint()
+        ..color = const Color(0x223B82F6) // faint blue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0 / cam.zoom;
+      final halfW = fig.canvasWidth / 2;
+      final halfH = fig.canvasHeight / 2;
+      for (var x = -halfW; x <= halfW; x += g) {
+        canvas.drawLine(Offset(x, -halfH), Offset(x, halfH), gridPaint);
+      }
+      for (var y = -halfH; y <= halfH; y += g) {
+        canvas.drawLine(Offset(-halfW, y), Offset(halfW, y), gridPaint);
+      }
+    }
+
     if (c.isAnimateMode) {
       _paintOnion(canvas, size);
     }
     _paintCycleFills(canvas);
     _paintSegments(canvas);
+    _paintCollision(canvas);
     if (c.showConnectors) _paintConnectors(canvas);
     if (c.activeTool == EditorTool.curve) _paintCurveControls(canvas);
     if (c.isAssetMode) _paintAssetEditor(canvas);
@@ -223,6 +240,9 @@ class FigureCanvasPainter extends CustomPainter {
       return null;
     }
 
+    Color opaque(Color? color) =>
+        (color ?? const Color(0xFFD1D5DB)).withValues(alpha: 1);
+
     void ghost(double t, int dir, double alpha) {
       final pts = List<Point2>.generate(fig.points.length, (i) {
         final track = anim.getTrack(i);
@@ -231,6 +251,16 @@ class FigureCanvasPainter extends CustomPainter {
         if (kf == null) return fig.points[i];
         return Point2(kf.x, kf.y);
       });
+
+      // Draw the entire ghost with the segment's ORIGINAL (opaque) colours
+      // into ONE layer, then composite the layer once with [alpha]. Applying
+      // alpha per segment makes overlaps accumulate (0.3 -> 0.51 -> 0.66 ...)
+      // and look thicker; this keeps every part of the ghost evenly faint.
+      canvas.saveLayer(
+        null,
+        Paint()..color = Color.fromRGBO(0, 0, 0, alpha),
+      );
+
       for (final seg in fig.segments) {
         if (seg.hidden) continue;
         if (seg.type == 'image' || seg.isNone) continue;
@@ -244,9 +274,12 @@ class FigureCanvasPainter extends CustomPainter {
         final p1 = pts[seg.point1Index];
         final p2 = pts[seg.point2Index];
         final overColor = _colorOverrideAtSeg(fig, seg, t);
-        final strokeColor =
-            (parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB))
-                .withValues(alpha: alpha);
+        final strokeColor = opaque(parseHexColor(overColor ?? seg.color));
+        final ghostPaint = Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = seg.width <= 0 ? 3 : seg.width;
         if (seg.type == 'circle') {
           final mx = (p1.x + p2.x) / 2;
           final my = (p1.y + p2.y) / 2;
@@ -257,31 +290,21 @@ class FigureCanvasPainter extends CustomPainter {
             1.0,
           );
           if (seg.filled) {
-            final fillColor =
-                (parseHexColor(overColor) ??
-                        parseHexColor(seg.fillColor) ??
-                        parseHexColor(seg.color) ??
-                        const Color(0xFFD1D5DB))
-                    .withValues(alpha: alpha);
-            canvas.drawCircle(Offset(mx, my), r, Paint()..color = fillColor);
+            canvas.drawCircle(
+              Offset(mx, my),
+              r,
+              Paint()
+                ..color = opaque(parseHexColor(overColor) ??
+                    parseHexColor(seg.fillColor) ??
+                    parseHexColor(seg.color)),
+            );
           }
-          canvas.drawCircle(
-            Offset(mx, my),
-            r,
-            Paint()
-              ..color = strokeColor
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = seg.width <= 0 ? 3 : seg.width,
-          );
+          canvas.drawCircle(Offset(mx, my), r, ghostPaint);
         } else {
-          final paint = Paint()
-            ..color = strokeColor
-            ..style = PaintingStyle.stroke
-            ..strokeCap = StrokeCap.round
-            ..strokeWidth = seg.width <= 0 ? 3 : seg.width;
-          _drawSegmentLine(canvas, paint, seg, p1, p2);
+          _drawSegmentLine(canvas, ghostPaint, seg, p1, p2);
         }
       }
+      canvas.restore();
     }
 
     if (c.onionPrev) ghost(c.currentTime, -1, 0.3);
@@ -540,6 +563,123 @@ class FigureCanvasPainter extends CustomPainter {
         );
       } else if (seg.type == 'image') {
         _paintImageSegment(canvas, seg, p1, p2, opacity);
+      } else if (seg.type == 'text') {
+        _paintTextSegment(canvas, seg, p1, p2, opacity, overColor);
+      }
+    }
+  }
+
+  /// Draws a `text` segment: the label centred at the segment midpoint and
+  /// rotated to the segment angle so its two points can animate position,
+  /// rotation, and (via the inspector) scale.
+  void _paintTextSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2,
+      double opacity, String? overColor) {
+    final text = seg.text;
+    if (text == null || text.isEmpty) return;
+    final mx = (p1.x + p2.x) / 2;
+    final my = (p1.y + p2.y) / 2;
+    final angle = math.atan2(p2.y - p1.y, p2.x - p1.x);
+    final baseColor =
+        parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: baseColor.withValues(alpha: baseColor.a * opacity),
+          fontSize: seg.textSize <= 0 ? 32 : seg.textSize,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Inter',
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    canvas.save();
+    canvas.translate(mx, my);
+    canvas.rotate(angle);
+    tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+    canvas.restore();
+  }
+
+  /// Game-dev markers: a dashed green bounding box around any figure flagged
+  /// as collision, plus a green badge on individual collision segments.
+  void _paintCollision(Canvas canvas) {
+    if (fig.segments.isEmpty) return;
+    final z = c.camera.zoom;
+    final green = const Color(0xFF22C55E);
+    final badgePaint = Paint()
+      ..color = green
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2 / z;
+    final fillPaint = Paint()
+      ..color = const Color(0x3322C55E)
+      ..style = PaintingStyle.fill;
+
+    final drawnFigs = <int>{};
+    for (final seg in fig.segmentsInDrawOrder()) {
+      if (seg.hidden || seg.isNone) continue;
+      if (seg.point1Index >= fig.points.length ||
+          seg.point2Index >= fig.points.length) {
+        continue;
+      }
+      final key = fig.segmentFigureKey(seg);
+      if (key < 0) continue;
+
+      if (!drawnFigs.contains(key)) {
+        drawnFigs.add(key);
+        final visible = !c.isAnimateMode ||
+            _visibleAt(fig, seg.point1Index, c.currentTime);
+        if (visible && fig.getFigureCollision(key)) {
+          final comp = fig.connectedComponent(key);
+          double minX = double.infinity,
+              minY = double.infinity,
+              maxX = -double.infinity,
+              maxY = -double.infinity;
+          for (final i in comp) {
+            final p = fig.points[i];
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+          }
+          if (minX != double.infinity) {
+            final rect = Rect.fromLTRB(
+                minX - 8, minY - 8, maxX + 8, maxY + 8);
+            final path = Path()
+              ..addRRect(
+                  RRect.fromRectAndRadius(rect, const Radius.circular(6)));
+            canvas.drawPath(path, fillPaint);
+            canvas.drawPath(path, badgePaint);
+            final tp = TextPainter(
+              text: const TextSpan(
+                text: 'C',
+                style: TextStyle(
+                  color: Color(0xFF22C55E),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout();
+            tp.paint(canvas, Offset(rect.left + 2, rect.top - tp.height - 2));
+          }
+        }
+      }
+
+      if (seg.isCollision) {
+        final p1 = fig.points[seg.point1Index];
+        final p2 = fig.points[seg.point2Index];
+        final mx = (p1.x + p2.x) / 2 + seg.imageOffsetX;
+        final my = (p1.y + p2.y) / 2 + seg.imageOffsetY;
+        canvas.drawCircle(Offset(mx, my), 6 / z,
+            Paint()..color = green);
+        canvas.drawCircle(
+          Offset(mx, my),
+          6 / z,
+          Paint()
+            ..color = const Color(0xFFFFFFFF)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5 / z,
+        );
       }
     }
   }
@@ -696,12 +836,15 @@ class FigureCanvasPainter extends CustomPainter {
     for (var i = 0; i < fig.points.length; i++) {
       if (c.isAnimateMode && !_visibleAt(fig, i, c.currentTime)) continue;
       final pt = fig.points[i];
+      final multi = c.multiSelection.contains(i);
       final sel = i == c.selectedPointIndex;
-      final r = (sel ? 7 : 5) / z;
+      final r = (sel ? 7 : multi ? 6.5 : 5) / z;
       final isRoot = fig.rootIndices.contains(i);
       final Color fill;
       if (sel) {
         fill = const Color(0xFFFACC15);
+      } else if (multi) {
+        fill = const Color(0xFF22D3EE); // cyan for multi-selected points
       } else if (pt.isAttached) {
         fill = const Color(0xFFF97316); // orange for attached pivot
       } else if (isRoot) {

@@ -10,6 +10,22 @@ import 'package:id_animate/core/minecraft_skin.dart';
 Rect uvRect(McUv uv) =>
     Rect.fromLTWH(uv.x.toDouble(), uv.y.toDouble(), uv.w.toDouble(), uv.h.toDouble());
 
+/// Draws [src] into [dst], mirroring it horizontally when [flip] is true,
+/// matching the production importer's side-face orientation.
+void _drawUvTest(Canvas canvas, ui.Image img, Rect src, Rect dst, Paint p,
+    {bool flip = false}) {
+  if (!flip) {
+    canvas.drawImageRect(img, src, dst, p);
+    return;
+  }
+  canvas.save();
+  canvas.translate(dst.center.dx, dst.center.dy);
+  canvas.scale(-1, 1);
+  canvas.translate(-dst.center.dx, -dst.center.dy);
+  canvas.drawImageRect(img, src, dst, p);
+  canvas.restore();
+}
+
 Future<ui.Image> decodeBytes(Uint8List bytes) async {
   final codec = await ui.instantiateImageCodec(bytes);
   final frame = await codec.getNextFrame();
@@ -80,9 +96,11 @@ void main() {
         final w = face.screenW * scale;
         if (w < 0.5) continue;
         final dst = Rect.fromLTWH(x, topY, w, h);
-        canvas.drawImageRect(skin, uvRect(face.baseUv), dst, paint);
+        final flip = mcSideFace(face.side);
+        _drawUvTest(canvas, skin, uvRect(face.baseUv), dst, paint, flip: flip);
         if (includeOuter && face.outerUv != null) {
-          canvas.drawImageRect(skin, uvRect(face.outerUv!), dst, paint);
+          _drawUvTest(canvas, skin, uvRect(face.outerUv!), dst, paint,
+              flip: flip);
         }
         x += w;
       }
@@ -123,11 +141,15 @@ void main() {
     var offsetX = 0.0;
     for (final face in faces) {
       final w = face.screenW * scale;
-      // Integer scale 12; sample every texel's "top-left" corner block.
+      final flip = mcSideFace(face.side);
+      // Integer scale 12; sample every texel's "top-left" corner block. The
+      // side faces are mirrored in the composed image (see mcSideFace).
       for (var ty = 0; ty < part.height.toInt(); ty++) {
         for (var tx = 0; tx < face.screenW.toInt(); tx++) {
-          final cx = offsetX.round() + tx * 12;
-          final cy = ty * 12;
+          final s = scale.toInt();
+          final cx = offsetX.round() +
+              (flip ? (face.screenW.toInt() - tx) * s - s : tx * s);
+          final cy = ty * s;
           expect(
             await colorsEqual(
               composed, cx, cy, skin, face.baseUv.x + tx, face.baseUv.y + ty),
@@ -152,15 +174,41 @@ void main() {
     );
     final fig = result.figure;
     expect(fig.points.length, 12); // 6 parts x 2 points
-    expect(fig.segments.length, 6);
-    expect(fig.rootIndices.length, 6);
+    expect(fig.segments.length, 11); // 6 image parts + 5 'none' rig bones
+    expect(fig.rootIndices.length, 1); // single rig root at the hips
+    expect(fig.rootIndices.first, 2); // Body bottom point (hips)
     expect(result.partNames,
         ['Head', 'Body', 'Right Arm', 'Left Arm', 'Right Leg', 'Left Leg']);
 
-    // Head top-edge baseline at scale 12, yaw 0: cx=0, topY=-384, halfW=48.
-    expect(fig.points[0].x, closeTo(-48, 0.001));
-    expect(fig.points[0].y, closeTo(-384, 0.001));
-    expect(fig.points[1].x, closeTo(48, 0.001));
+    // Every non-body part is joined to the torso by exactly one 'none' segment.
+    final noneSegs =
+        fig.segments.where((s) => s.type == 'none').toList();
+    expect(noneSegs.length, 5);
+    for (final s in noneSegs) {
+      // Each bone anchors on the torso (Body points are indices 2,3).
+      final onBody = s.point1Index == 2 || s.point1Index == 3 ||
+          s.point2Index == 2 || s.point2Index == 3;
+      expect(onBody, isTrue, reason: 'bone must anchor on the torso: ${s.id}');
+    }
+
+    // Image segments must be vertical at exactly -90° (p1 bottom -> p2 top),
+    // centred exactly on the part, and counter-rotated so they render upright.
+    // 'none' connector segments are exempt from the -90° rule.
+    for (final s in fig.segments) {
+      if (s.type != 'image') continue;
+      final p1 = fig.points[s.point1Index];
+      final p2 = fig.points[s.point2Index];
+      expect(p1.x, closeTo(p2.x, 0.001), reason: 'vertical ${s.id}');
+      expect(p2.y, lessThan(p1.y), reason: 'p2 (top) above p1 (bottom)');
+      expect(s.imageOffsetX, 0.0);
+      expect(s.imageOffsetY, 0.0);
+      expect(s.imageRotate, 90.0);
+    }
+
+    // Head baseline at scale 12, yaw 0: vertical, bottom (0,-288) -> top (0,-384).
+    expect(fig.points[0].x, closeTo(0, 0.001));
+    expect(fig.points[0].y, closeTo(-288, 0.001));
+    expect(fig.points[1].x, closeTo(0, 0.001));
     expect(fig.points[1].y, closeTo(-384, 0.001));
 
     for (final entry in {
@@ -203,7 +251,7 @@ void main() {
       includeOuter: true,
     );
     expect(result.figure.points.length, 12);
-    expect(result.figure.segments.length, 6);
+    expect(result.figure.segments.length, 11);
 
     await compositAndWrite(
       skinPath: 'alex.png',

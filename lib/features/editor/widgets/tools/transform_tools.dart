@@ -13,6 +13,58 @@ extension _TransformTools on _FigureCanvasState {
         widget.controller.setSelectedSegment(null);
         return;
       }
+      // Multi-select stretch: scales the whole selected set around the grabbed
+      // point (fixed pivot), including segment widths between selected points.
+      final multiSel = widget.controller.multiSelection;
+      if (multiSel.length > 1 && multiSel.contains(ptHit)) {
+        widget.controller.setSelectedPoint(ptHit);
+        final msf = _segmentTouching(fig, ptHit);
+        widget.controller.setSelectedSegment(msf?.id);
+        final set = multiSel.toList();
+        final mx = fig.points[ptHit].x;
+        final my = fig.points[ptHit].y;
+        final origCtrl = <String, _Ctrl>{};
+        final origSegs = <String, _SegInitial>{};
+        for (final s in fig.segments) {
+          if (s.curved && s.controlDX != null && s.controlDY != null) {
+            origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+          }
+          if (multiSel.contains(s.point1Index) &&
+              multiSel.contains(s.point2Index)) {
+            double iw = 100.0;
+            if (s.imageWidth is num) iw = (s.imageWidth as num).toDouble();
+            double ih = 100.0;
+            if (s.imageHeight is num) ih = (s.imageHeight as num).toDouble();
+            origSegs[s.id] =
+                _SegInitial(width: s.width, imageWidth: iw, imageHeight: ih);
+          }
+        }
+        final startDist =
+            math.sqrt((w.dx - mx) * (w.dx - mx) + (w.dy - my) * (w.dy - my));
+        _captureAnchorForPoint(fig, ptHit, all: true);
+        _drag
+          ..reset()
+          ..active = true
+          ..isPoint = false
+          ..stretching = true
+          ..pivot = ptHit
+          ..connPts = set
+          ..initAngles = set
+              .map((i) => math.atan2(fig.points[i].y - my, fig.points[i].x - mx))
+              .toList()
+          ..initDists = set
+              .map((i) => math.sqrt(
+                  (fig.points[i].x - mx) * (fig.points[i].x - mx) +
+                      (fig.points[i].y - my) * (fig.points[i].y - my)))
+              .toList()
+          ..startDist = startDist > 0.001 ? startDist : 1
+          ..fkCtrl = origCtrl
+          ..initSegs.addAll(origSegs)
+          ..startX = w.dx
+          ..startY = w.dy;
+        widget.controller.forceUpdate();
+        return;
+      }
       widget.controller.setSelectedPoint(ptHit);
       final sf = _segmentTouching(fig, ptHit);
       widget.controller.setSelectedSegment(sf?.id);
@@ -139,6 +191,48 @@ extension _TransformTools on _FigureCanvasState {
     }
 
     final subRoot = _rootOfPoint(fig, ptHit);
+
+    // Multi-select pivot rotate: dragging any selected point turns the whole
+    // selection set about that point, overriding the single-figure rules.
+    final multiSel = widget.controller.multiSelection;
+    if (multiSel.length > 1 && multiSel.contains(ptHit)) {
+      widget.controller.setSelectedPoint(ptHit);
+      final mseg = _segmentTouching(fig, ptHit);
+      widget.controller.setSelectedSegment(mseg?.id);
+      final set = multiSel.toList();
+      final mx = fig.points[ptHit].x;
+      final my = fig.points[ptHit].y;
+      final origCtrl = <String, _Ctrl>{};
+      for (final s in fig.segments) {
+        if (!s.curved || s.controlDX == null || s.controlDY == null) continue;
+        if (multiSel.contains(s.point1Index) ||
+            multiSel.contains(s.point2Index)) {
+          origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+        }
+      }
+      _captureAnchorForPoint(fig, ptHit, all: true);
+      _drag
+        ..reset()
+        ..active = true
+        ..rotating = true
+        ..pivot = ptHit
+        ..connPts = set
+        ..initAngles = set
+            .map((i) => math.atan2(fig.points[i].y - my, fig.points[i].x - mx))
+            .toList()
+        ..initDists = set
+            .map((i) => math.sqrt(
+                (fig.points[i].x - mx) * (fig.points[i].x - mx) +
+                    (fig.points[i].y - my) * (fig.points[i].y - my)))
+            .toList()
+        ..startAngle = math.atan2(w.dy - my, w.dx - mx)
+        ..startPtX = mx
+        ..startPtY = my
+        ..fkCtrl = origCtrl;
+      widget.controller.forceUpdate();
+      return true;
+    }
+
     // 1. Root points should NEVER rotate.
     if (ptHit == subRoot) {
       return false;

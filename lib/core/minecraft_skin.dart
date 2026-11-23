@@ -219,9 +219,13 @@ Future<Uint8List?> projectPartPng(
     final w = face.screenW * scale;
     if (w < 0.5) continue;
     final dst = ui.Rect.fromLTWH(x, 0, w, pixelH.toDouble());
-    _drawFace(canvas, skin, face.baseUv, dst, paint);
+    // The 'right'/'left' side faces are stored in the Java skin layout so that
+    // they wrap around the model; viewed straight-on they are mirrored. Flipping
+    // them horizontally makes the character face forward instead of backward.
+    final flip = mcSideFace(face.side);
+    _drawFace(canvas, skin, face.baseUv, dst, paint, flip: flip);
     if (includeOuter && face.outerUv != null) {
-      _drawFace(canvas, skin, face.outerUv!, dst, paint);
+      _drawFace(canvas, skin, face.outerUv!, dst, paint, flip: flip);
     }
     x += w;
   }
@@ -239,12 +243,27 @@ void _drawFace(
   ui.Image skin,
   McUv uv,
   ui.Rect dst,
-  ui.Paint paint,
-) {
+  ui.Paint paint, {
+  bool flip = false,
+}) {
   final src = ui.Rect.fromLTWH(
       uv.x.toDouble(), uv.y.toDouble(), uv.w.toDouble(), uv.h.toDouble());
+  if (!flip) {
+    canvas.drawImageRect(skin, src, dst, paint);
+    return;
+  }
+  canvas.save();
+  canvas.translate(dst.center.dx, dst.center.dy);
+  canvas.scale(-1, 1);
+  canvas.translate(-dst.center.dx, -dst.center.dy);
   canvas.drawImageRect(skin, src, dst, paint);
+  canvas.restore();
 }
+
+/// Whether [side] is a horizontal side face ('right'/'left'). In the Java
+/// skin layout these faces wrap around the model and are stored mirrored
+/// relative to how they appear when viewed straight on.
+bool mcSideFace(String side) => side == 'right' || side == 'left';
 
 /// Result of building a character figure from a skin.
 class McImportResult {
@@ -255,15 +274,24 @@ class McImportResult {
 
 /// Builds a [Figure] from a raw skin PNG.
 ///
-/// * [scale]        - world units per skin pixel (default 8, so the 8x8 head
-///                     becomes 64x64 world units).
+/// * [scale]        - world units per skin pixel (default 8).
 /// * [yawDeg]       - horizontal rotation angle (default 0 = front view).
 /// * [includeOuter] - draw the clothing/overlay layer on top of the base.
 ///
-/// Every body part becomes its own image-segment root, centered at its
-/// character position, so parts can be rigged/animated independently. Image
-/// segments use a horizontal top-edge baseline (p1->p2) so the painter renders
-/// them unrotated, with the part encoded like the SVG-as-assets importer.
+/// Every body part becomes its own vertical image segment (baseline pointing
+/// straight up, so the segment angle is exactly -90°; `imageRotate` = +90°
+/// cancels it and keeps the image upright). Each image is centred exactly on
+/// the segment midpoint, i.e. the part's centre.
+///
+/// The result is a ready-to-pose rig with a single root at the hips:
+///
+/// * body segment top (neck/shoulder line) -> `none` -> head and both arms;
+/// * body root (hips)                        -> `none` -> both legs.
+///
+/// Every part connects to the torso/body through exactly one invisible `none`
+/// segment (none segments are excluded from the -90° orientation rule), so the
+/// whole character is ONE connected figure: the body can be moved/scaled as a
+/// unit while each limb still rotates around its joint.
 Future<McImportResult> buildMinecraftSkinFigure(
   Uint8List pngBytes, {
   double scale = 8,
@@ -276,6 +304,8 @@ Future<McImportResult> buildMinecraftSkinFigure(
 
   final figure = Figure('Minecraft Character');
   final partNames = <String>[];
+  // part name -> [p1 index (bottom), p2 index (top)].
+  final partIndices = <String, List<int>>{};
 
   for (final part in kMcParts) {
     final png = await projectPartPng(
@@ -292,16 +322,17 @@ Future<McImportResult> buildMinecraftSkinFigure(
     final layout = mcPartLayout(part);
     final cx = layout.cx * scale;
     final topY = layout.topY * scale;
-    final halfW = worldW / 2;
+    final bottomY = topY + h;
 
     final startIdx = figure.points.length;
-    // Horizontal top-edge baseline (p1->p2). The canvas painter rotates image
-    // segments by the p1->p2 angle, so a diagonal TL->BR pair would tilt the
-    // part; a horizontal pair keeps rotation 0 and imageOffsetY centers the
-    // part vertically within its height.
+    // Vertical baseline pointing up: p1 = bottom, p2 = top, so the segment
+    // angle is exactly -90°. The painter draws image segments rotated by the
+    // p1->p2 angle; imageRotate = +90° cancels it and the image renders
+    // upright. imageOffset = 0 keeps the image centred exactly on the part's
+    // midpoint.
     figure.points.addAll([
-      Point2(cx - halfW, topY),
-      Point2(cx + halfW, topY),
+      Point2(cx, bottomY),
+      Point2(cx, topY),
     ]);
 
     final seg = Segment('image')
@@ -311,14 +342,47 @@ Future<McImportResult> buildMinecraftSkinFigure(
       ..imageWidth = worldW
       ..imageHeight = h
       ..imageOffsetX = 0.0
-      ..imageOffsetY = h / 2
-      ..imageRotate = 0.0
+      ..imageOffsetY = 0.0
+      ..imageRotate = 90.0
       ..curved = false
       ..layer = figure.segments.length
       ..hidden = false;
     figure.segments.add(seg);
-    figure.rootIndices.add(startIdx);
+    partIndices[part.name] = [startIdx, startIdx + 1];
     partNames.add(part.name);
+  }
+
+  // Rig wiring. Image segments are vertical (p1 = bottom, p2 = top). The body
+  // segment's top point is the neck/shoulder line and its bottom point is the
+  // root (hips).
+  final head = partIndices['Head'];
+  final body = partIndices['Body'];
+  final rarm = partIndices['Right Arm'];
+  final larm = partIndices['Left Arm'];
+  final rleg = partIndices['Right Leg'];
+  final lleg = partIndices['Left Leg'];
+
+  if (body == null) {
+    if (figure.points.isNotEmpty) figure.rootIndices = [0];
+  } else {
+    final bodyTop = body[1];
+    final bodyRoot = body[0];
+    figure.rootIndices = [bodyRoot];
+    void addBone(int fromIdx, int toIdx) {
+      figure.segments.add(Segment('none')
+        ..point1Index = fromIdx
+        ..point2Index = toIdx
+        ..layer = figure.segments.length
+        ..hidden = false);
+    }
+
+    // Body segment -> none -> head + arms (join at the neck/shoulder line).
+    if (head != null) addBone(bodyTop, head[0]);
+    if (rarm != null) addBone(bodyTop, rarm[1]);
+    if (larm != null) addBone(bodyTop, larm[1]);
+    // Body root -> none -> legs (join at the hips).
+    if (rleg != null) addBone(bodyRoot, rleg[1]);
+    if (lleg != null) addBone(bodyRoot, lleg[1]);
   }
 
   skin.dispose();

@@ -117,11 +117,6 @@ class _FigureCanvasState extends State<FigureCanvas> {
     return fig.getFigureVisibility(fig.figureKeyFor(pointIdx), t);
   }
 
-  double _opacityAt(Figure fig, int pointIdx, double t) {
-    if (pointIdx < 0 || pointIdx >= fig.points.length) return 1.0;
-    return fig.getFigureOpacity(fig.figureKeyFor(pointIdx), t);
-  }
-
   int _hitTestPoint(Offset w) {
     final fig = widget.controller.figure;
     final z = widget.controller.camera.zoom;
@@ -210,6 +205,25 @@ class _FigureCanvasState extends State<FigureCanvas> {
             lx <= size.width / 2 &&
             ly >= -size.height / 2 &&
             ly <= size.height / 2) {
+          return seg.id;
+        }
+      } else if (seg.type == 'text') {
+        if (seg.text == null || seg.text!.isEmpty) continue;
+        final mx = (p1.x + p2.x) / 2;
+        final my = (p1.y + p2.y) / 2;
+        final angle = math.atan2(p2.y - p1.y, p2.x - p1.x);
+        final dx = w.dx - mx;
+        final dy = w.dy - my;
+        final cosR = math.cos(angle);
+        final sinR = math.sin(angle);
+        final lx = dx * cosR + dy * sinR;
+        final ly = -dx * sinR + dy * cosR;
+        final tw = (seg.textSize <= 0 ? 32 : seg.textSize) * seg.text!.length * 0.55;
+        final th = seg.textSize <= 0 ? 32 : seg.textSize;
+        if (lx >= -tw &&
+            lx <= tw &&
+            ly >= -th &&
+            ly <= th) {
           return seg.id;
         }
       }
@@ -427,6 +441,13 @@ class _FigureCanvasState extends State<FigureCanvas> {
     final cam = widget.controller.camera;
     final w = _screenToWorld(loc, _canvasSize, cam);
 
+    // A real drag invalidates the pending tap-to-toggle on a multi-selection.
+    final moveDx = w.dx - d.startX;
+    final moveDy = w.dy - d.startY;
+    if (moveDx * moveDx + moveDy * moveDy > 4 * 4 / (cam.zoom * cam.zoom)) {
+      d.maybeTap = false;
+    }
+
     if (d.assetDrag) {
       handleAssetMove(w, fig, d);
       return;
@@ -580,6 +601,12 @@ class _FigureCanvasState extends State<FigureCanvas> {
       widget.controller.forceUpdate();
     }
 
+    // Snap dragging points to the grid (and the grabbed point onto other
+    // points) before recording so keyframes land on snap values too.
+    if (widget.controller.snapEnabled) {
+      _snapMovedPoints();
+    }
+
     // Animation recording.
     if (widget.controller.isAnimateMode && !d.creating) {
       final recPts = <int>{};
@@ -610,18 +637,53 @@ class _FigureCanvasState extends State<FigureCanvas> {
     }
   }
 
+  void _snapMovedPoints() {
+    final fig = widget.controller.figure;
+    final d = _drag;
+    final indices =
+        d.connPts.isNotEmpty ? d.connPts.toSet() : <int>{d.ptIdx};
+    final g = widget.controller.snapGrid;
+    if (g > 0) {
+      for (final i in indices) {
+        if (i < 0 || i >= fig.points.length) continue;
+        fig.points[i].x = (fig.points[i].x / g).roundToDouble() * g;
+        fig.points[i].y = (fig.points[i].y / g).roundToDouble() * g;
+      }
+    }
+    // Point-to-point snapping for the grabbed point only: lands exactly on a
+    // nearby point that is not part of the selection.
+    if (d.ptIdx >= 0 && d.ptIdx < fig.points.length) {
+      final z = widget.controller.camera.zoom;
+      final thresh = 12 / z;
+      final p = fig.points[d.ptIdx];
+      for (var j = 0; j < fig.points.length; j++) {
+        if (j == d.ptIdx || indices.contains(j)) continue;
+        final q = fig.points[j];
+        if ((p.x - q.x).abs() < thresh && (p.y - q.y).abs() < thresh) {
+          p.x = q.x;
+          p.y = q.y;
+          break;
+        }
+      }
+    }
+  }
+
   void _rotateCurveControls(Figure fig, _DragState d, double angleDelta) {
     final npSet = d.connPts.toSet();
     for (final s in fig.segments) {
       if (!s.curved || s.controlDX == null || s.controlDY == null) continue;
-      if (npSet.contains(s.point1Index) && npSet.contains(s.point2Index)) {
-        final orig = d.fkCtrl[s.id];
-        if (orig == null) continue;
-        final cosA = math.cos(angleDelta);
-        final sinA = math.sin(angleDelta);
-        s.controlDX = orig.dx * cosA - orig.dy * sinA;
-        s.controlDY = orig.dx * sinA + orig.dy * cosA;
+      // Rotate whenever at least one endpoint moves: segments attached to the
+      // (stationary) pivot have the pivot endpoint outside the rotating set,
+      // yet their curve handle must follow the rotation too.
+      if (!npSet.contains(s.point1Index) && !npSet.contains(s.point2Index)) {
+        continue;
       }
+      final orig = d.fkCtrl[s.id];
+      if (orig == null) continue;
+      final cosA = math.cos(angleDelta);
+      final sinA = math.sin(angleDelta);
+      s.controlDX = orig.dx * cosA - orig.dy * sinA;
+      s.controlDY = orig.dx * sinA + orig.dy * cosA;
     }
   }
 
@@ -629,12 +691,13 @@ class _FigureCanvasState extends State<FigureCanvas> {
     final npSet = d.connPts.toSet();
     for (final s in fig.segments) {
       if (!s.curved || s.controlDX == null || s.controlDY == null) continue;
-      if (npSet.contains(s.point1Index) && npSet.contains(s.point2Index)) {
-        final orig = d.fkCtrl[s.id];
-        if (orig == null) continue;
-        s.controlDX = orig.dx * factor;
-        s.controlDY = orig.dy * factor;
+      if (!npSet.contains(s.point1Index) && !npSet.contains(s.point2Index)) {
+        continue;
       }
+      final orig = d.fkCtrl[s.id];
+      if (orig == null) continue;
+      s.controlDX = orig.dx * factor;
+      s.controlDY = orig.dy * factor;
     }
   }
 
@@ -745,8 +808,11 @@ class _FigureCanvasState extends State<FigureCanvas> {
           fig.points[p].x += dx;
           fig.points[p].y += dy;
         }
-        final newTarget = widget.controller.joinPoints(d.ptIdx, i);
-        fig.points[newTarget].isAttached = true;
+        // Mark the host point as the attachment joint BEFORE merging so the
+        // figure-key remap inside joinPoints keeps overrides (colour, etc.)
+        // scoped to the attached figure.
+        fig.points[i].isAttached = true;
+        widget.controller.joinPoints(d.ptIdx, i);
         d.jointDone = true;
         d.active = false;
         return;
@@ -758,8 +824,16 @@ class _FigureCanvasState extends State<FigureCanvas> {
     final wasCreating = _drag.creating;
     final wasDragging = _drag.active || _drag.isPan;
     final wasAsset = _drag.assetDrag;
+    final wasMaybeTap = _drag.maybeTap;
+    final wasTapSelected = _drag.tapWasSelected;
+    final tapIdx = _drag.ptIdx;
     _drag.reset();
     _lastPt = null;
+    // A tap on an already-selected point of a multi-selection toggles it off;
+    // a tap on a fresh point (already added on pointer-down) just keeps it.
+    if (wasMaybeTap && wasTapSelected && tapIdx >= 0) {
+      widget.controller.toggleMultiSelect(tapIdx);
+    }
     if (wasCreating) widget.controller.pushHistory();
     if (wasAsset) widget.controller.pushHistory();
     if (wasDragging) {

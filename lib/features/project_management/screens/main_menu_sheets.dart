@@ -507,6 +507,17 @@ class _ProfileSheet extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  Divider(color: palette.border, height: 1),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Version $appVersion ($appBuildNumber)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: palette.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ),
             ),

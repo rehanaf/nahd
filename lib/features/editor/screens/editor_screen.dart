@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/widgets/color_picker_sheet.dart';
 
+import '../../../core/lottie_export.dart';
 import '../../../core/models/figure.dart';
 import '../../../core/models/segment.dart';
+import '../../../core/pose_library.dart';
 import '../../../core/project_storage.dart';
+import '../../../core/render/figure_render.dart';
 import '../controllers/editor_controller.dart';
 import '../controllers/editor_controller_svg_extension.dart';
 import '../../../core/theme/app_theme.dart';
@@ -19,6 +23,9 @@ import '../widgets/segment_inspector.dart';
 import '../widgets/frames_screen.dart';
 
 part 'editor_screen_sheets.dart';
+
+/// Single accent colour used by every editor tool button for a unified look.
+const Color kToolColor = Color(0xFF2563EB);
 
 class EditorScreen extends StatefulWidget {
   final EditorController controller;
@@ -308,7 +315,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 _drawerSegmentIcon(
                   icon: Icons.edit,
                   label: 'Line',
-                  color: const Color(0xFF22C55E),
+                  color: kToolColor,
                   onTap: () {
                     c.addSegment('line');
                     Navigator.of(context).pop();
@@ -318,7 +325,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 _drawerSegmentIcon(
                   icon: Icons.panorama_fish_eye,
                   label: 'Circle',
-                  color: const Color(0xFF3B82F6),
+                  color: kToolColor,
                   onTap: () {
                     c.addSegment('circle');
                     Navigator.of(context).pop();
@@ -328,7 +335,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 _drawerSegmentIcon(
                   icon: Icons.image,
                   label: 'Image',
-                  color: const Color(0xFFEC4899),
+                  color: kToolColor,
                   onTap: () => _pickAndAddImageSegment(c),
                   palette: palette,
                 ),
@@ -624,13 +631,13 @@ class _EditorScreenState extends State<EditorScreen> {
                         children: [
                           EditorIconButton(
                             icon: Icons.create_new_folder,
-                            color: const Color(0xFF22C55E),
+                            color: kToolColor,
                             onTap: () => _scaffoldKey.currentState?.openDrawer(),
                           ),
                           const SizedBox(width: 4),
                           EditorIconButton(
                             icon: Icons.pan_tool,
-                            color: const Color(0xFF8B5CF6),
+                            color: kToolColor,
                             active: c.panEnabled,
                             onTap: c.togglePanEnabled,
                           ),
@@ -649,7 +656,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       // Pivot (default active).
                       EditorIconButton(
                         icon: Icons.rotate_right,
-                        color: const Color(0xFFF97316),
+                        color: kToolColor,
                         active: c.activeTool == EditorTool.rotate,
                         onTap: () => c.setTool(EditorTool.rotate),
                       ),
@@ -660,15 +667,15 @@ class _EditorScreenState extends State<EditorScreen> {
                           ToolGroupSub(
                               icon: Icons.open_with,
                               key: 'point',
-                              color: Color(0xFF3B82F6)),
+                              color: kToolColor),
                           ToolGroupSub(
                               icon: Icons.center_focus_strong,
                               key: 'modify',
-                              color: Color(0xFF06B6D4)),
+                              color: kToolColor),
                           ToolGroupSub(
                               icon: Icons.timeline,
                               key: 'curve',
-                              color: Color(0xFFEC4899)),
+                              color: kToolColor),
                         ],
                         selectedKey: _modifyKey(c.activeTool),
                         onSelect: (k) {
@@ -686,15 +693,15 @@ class _EditorScreenState extends State<EditorScreen> {
                           ToolGroupSub(
                               icon: Icons.near_me,
                               key: 'moveAll',
-                              color: Color(0xFF22C55E)),
+                              color: kToolColor),
                           ToolGroupSub(
                               icon: Icons.rotate_left,
                               key: 'rotateAll',
-                              color: Color(0xFFEAB308)),
+                              color: kToolColor),
                           ToolGroupSub(
                               icon: Icons.compress,
                               key: 'scaleAll',
-                              color: Color(0xFFF97316)),
+                              color: kToolColor),
                         ],
                         selectedKey: _transformKey(c.activeTool),
                         onSelect: (k) {
@@ -723,21 +730,21 @@ class _EditorScreenState extends State<EditorScreen> {
                           children: [
                             EditorIconButton(
                               icon: Icons.accessibility_new,
-                              color: const Color(0xFF22C55E),
+                              color: kToolColor,
                               active: c.rigMode == RigMode.rig,
                               onTap: () => c.setRigMode(RigMode.rig),
                             ),
                             const SizedBox(width: 4),
                             EditorIconButton(
                               icon: Icons.crop_rotate,
-                              color: const Color(0xFF8B5CF6),
+                              color: kToolColor,
                               active: c.rigMode == RigMode.asset,
                               onTap: () => c.setRigMode(RigMode.asset),
                             ),
                             const SizedBox(width: 4),
                             EditorIconButton(
                               icon: Icons.anchor,
-                              color: const Color(0xFF10B981),
+                              color: kToolColor,
                               active: c.rigMode == RigMode.anchor,
                               onTap: () => c.setRigMode(RigMode.anchor),
                             ),
@@ -777,7 +784,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Permanent Delete',
                           child: EditorIconButton(
                             icon: Icons.delete_forever,
-                            color: const Color(0xFFEF4444),
+                            color: kToolColor,
                             disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
                             onTap: () {
                               final ptIdx = c.selectedPointIndex ??
@@ -802,7 +809,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Attach Figure',
                           child: EditorIconButton(
                             icon: Icons.link,
-                            color: const Color(0xFFF59E0B),
+                            color: kToolColor,
                             active: c.activeTool == EditorTool.attach,
                             onTap: () {
                               c.setTool(c.activeTool == EditorTool.attach
@@ -818,7 +825,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Center Figure',
                           child: EditorIconButton(
                             icon: Icons.filter_center_focus,
-                            color: const Color(0xFF8B5CF6),
+                            color: kToolColor,
                             disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
                             onTap: () {
                               final ptIdx = c.selectedPointIndex ??
@@ -836,13 +843,10 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Toggle Visibility',
                           child: EditorIconButton(
                             icon: Icons.visibility,
-                            color: const Color(0xFF3B82F6),
+                            color: kToolColor,
                             disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
                             onTap: () {
-                              final ptIdx = c.selectedPointIndex ??
-                                  (c.selectedSegmentId != null
-                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
-                                      : null);
+                              final ptIdx = c.selectedFigurePoint();
                               if (ptIdx != null) {
                                 c.toggleFigureVisibility(ptIdx);
                               }
@@ -854,13 +858,10 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Opacity',
                           child: EditorIconButton(
                             icon: Icons.opacity,
-                            color: const Color(0xFF10B981),
+                            color: kToolColor,
                             disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
                             onTap: () {
-                              final ptIdx = c.selectedPointIndex ??
-                                  (c.selectedSegmentId != null
-                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
-                                      : null);
+                              final ptIdx = c.selectedFigurePoint();
                               if (ptIdx != null) {
                                 _showOpacitySlider(c, ptIdx);
                               }
@@ -869,9 +870,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         ),
                         const SizedBox(height: 4),
                         Builder(builder: (btnCtx) {
-                          final ptIdx = c.selectedSegmentId != null
-                              ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
-                              : c.selectedPointIndex;
+                          final ptIdx = c.selectedFigurePoint();
                           final hasSelection = ptIdx != null &&
                               ptIdx >= 0 &&
                               ptIdx < c.figure.points.length;
@@ -911,6 +910,75 @@ class _EditorScreenState extends State<EditorScreen> {
                         }),
                         const SizedBox(height: 4),
                         Builder(builder: (btnCtx) {
+                          final ptIdx = c.selectedFigurePoint();
+                          final hasSelection = ptIdx != null &&
+                              ptIdx >= 0 &&
+                              ptIdx < c.figure.points.length;
+                          final isCol = hasSelection &&
+                              c.isFigureCollision(ptIdx);
+                          return Tooltip(
+                            message: hasSelection
+                                ? (isCol
+                                    ? 'Collision: ON (tap to disable)'
+                                    : 'Collision: OFF (tap to enable)')
+                                : 'Collision (select a figure)',
+                            child: EditorIconButton(
+                              icon: Icons.shield_outlined,
+                              color: kToolColor,
+                              active: isCol,
+                              disabled: !hasSelection,
+                              onTap: hasSelection
+                                  ? () => c.toggleFigureCollision(ptIdx)
+                                  : null,
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 4),
+                        Builder(builder: (btnCtx) {
+                          final seg = c.selectedSegmentId != null
+                              ? c.figure.getSegment(c.selectedSegmentId!)
+                              : null;
+                          final isImg = seg != null && seg.type == 'image';
+                          return Tooltip(
+                            message: isImg
+                                ? 'Replace Image Asset'
+                                : 'Replace Image (select an image segment)',
+                            child: EditorIconButton(
+                              icon: Icons.image_search,
+                              color: kToolColor,
+                              disabled: !isImg,
+                              onTap: isImg
+                                  ? () async {
+                                      try {
+                                        final result = await FilePicker.pickFiles(
+                                          type: FileType.image,
+                                          withData: true,
+                                        );
+                                        if (result != null &&
+                                            result.files.isNotEmpty) {
+                                          final bytes = result.files.first.bytes;
+                                          if (bytes != null) {
+                                            final ext = result.files.first
+                                                    .extension ??
+                                                'png';
+                                            final b64 = base64Encode(bytes);
+                                            c.swapSegmentImage(
+                                              seg.id,
+                                              'data:image/$ext;base64,$b64',
+                                            );
+                                          }
+                                        }
+                                      } catch (err) {
+                                        debugPrint(
+                                            'Error replacing image: $err');
+                                      }
+                                    }
+                                  : null,
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 4),
+                        Builder(builder: (btnCtx) {
                           final seg = c.selectedSegmentId != null
                               ? c.figure.getSegment(c.selectedSegmentId!)
                               : null;
@@ -923,7 +991,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                 : 'Sprite Frame (select an image segment)',
                             child: EditorIconButton(
                               icon: Icons.photo_library,
-                              color: const Color(0xFFEC4899),
+                              color: kToolColor,
                               disabled: !isSpriteImage,
                               onTap: isSpriteImage
                                   ? () {
@@ -949,7 +1017,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Copy Pose',
                           child: EditorIconButton(
                             icon: Icons.copy,
-                            color: const Color(0xFFF59E0B),
+                            color: kToolColor,
                             onTap: () {
                               c.copyFrame(c.currentTime);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -966,7 +1034,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           message: 'Paste Pose',
                           child: EditorIconButton(
                             icon: Icons.paste,
-                            color: const Color(0xFFF59E0B),
+                            color: kToolColor,
                             disabled: !c.hasCopiedFrame,
                             onTap: () {
                               c.pasteFrame(c.currentTime);
@@ -997,7 +1065,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         message: 'Draw Tools',
                         child: EditorIconButton(
                           icon: Icons.edit,
-                          color: const Color(0xFF22C55E),
+                          color: kToolColor,
                           active: _sideTab == 0,
                           onTap: () => setState(() => _sideTab = 0),
                         ),
@@ -1008,7 +1076,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         message: 'Type Tools',
                         child: EditorIconButton(
                           icon: Icons.category,
-                          color: const Color(0xFF3B82F6),
+                          color: kToolColor,
                           active: _sideTab == 1,
                           onTap: () => setState(() => _sideTab = 1),
                         ),
@@ -1019,7 +1087,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         message: 'Linejoin Tools',
                         child: EditorIconButton(
                           icon: Icons.line_style,
-                          color: const Color(0xFFF97316),
+                          color: kToolColor,
                           active: _sideTab == 2,
                           onTap: () => setState(() => _sideTab = 2),
                         ),
@@ -1030,7 +1098,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         message: 'Appearance',
                         child: EditorIconButton(
                           icon: Icons.palette,
-                          color: const Color(0xFFEC4899),
+                          color: kToolColor,
                           active: _sideTab == 3,
                           onTap: () => setState(() => _sideTab = 3),
                         ),
@@ -1041,7 +1109,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         message: 'Segment Tools',
                         child: EditorIconButton(
                           icon: Icons.layers,
-                          color: const Color(0xFFA78BFA),
+                          color: kToolColor,
                           active: _sideTab == 4,
                           onTap: () => setState(() => _sideTab = 4),
                         ),
@@ -1069,7 +1137,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Line Tool',
                               child: EditorIconButton(
                                 icon: Icons.edit,
-                                color: const Color(0xFF22C55E),
+                                color: kToolColor,
                                 active: activeTool == EditorTool.line,
                                 onTap: () { c.setTool(EditorTool.line); setState(() {}); },
                               ),
@@ -1079,7 +1147,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Circle Tool',
                               child: EditorIconButton(
                                 icon: Icons.panorama_fish_eye,
-                                color: const Color(0xFF22C55E),
+                                color: kToolColor,
                                 active: activeTool == EditorTool.circle,
                                 onTap: () { c.setTool(EditorTool.circle); setState(() {}); },
                               ),
@@ -1089,9 +1157,19 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Image Tool',
                               child: EditorIconButton(
                                 icon: Icons.image,
-                                color: const Color(0xFF22C55E),
+                                color: kToolColor,
                                 active: activeTool == EditorTool.image,
                                 onTap: () { c.setTool(EditorTool.image); setState(() {}); },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Text Tool',
+                              child: EditorIconButton(
+                                icon: Icons.text_fields,
+                                color: kToolColor,
+                                active: activeTool == EditorTool.text,
+                                onTap: () { c.setTool(EditorTool.text); setState(() {}); },
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1099,7 +1177,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'None Tool',
                               child: EditorIconButton(
                                 icon: Icons.visibility_off,
-                                color: Colors.grey,
+                                color: kToolColor,
                                 active: activeTool == EditorTool.none,
                                 onTap: () { c.setTool(EditorTool.none); setState(() {}); },
                               ),
@@ -1111,7 +1189,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Join Tool',
                               child: EditorIconButton(
                                 icon: Icons.join_inner,
-                                color: const Color(0xFFF97316),
+                                color: kToolColor,
                                 active: activeTool == EditorTool.join,
                                 onTap: () { c.setTool(EditorTool.join); setState(() {}); },
                               ),
@@ -1128,7 +1206,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Type: Line',
                               child: EditorIconButton(
                                 icon: Icons.edit,
-                                color: const Color(0xFF3B82F6),
+                                color: kToolColor,
                                 active: segType == 'line',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1143,7 +1221,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Type: Circle',
                               child: EditorIconButton(
                                 icon: Icons.panorama_fish_eye,
-                                color: const Color(0xFF3B82F6),
+                                color: kToolColor,
                                 active: segType == 'circle',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1158,7 +1236,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Type: Image',
                               child: EditorIconButton(
                                 icon: Icons.image,
-                                color: const Color(0xFF3B82F6),
+                                color: kToolColor,
                                 active: segType == 'image',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1170,10 +1248,25 @@ class _EditorScreenState extends State<EditorScreen> {
                             ),
                             const SizedBox(height: 4),
                             Tooltip(
+                              message: 'Type: Text',
+                              child: EditorIconButton(
+                                icon: Icons.text_fields,
+                                color: kToolColor,
+                                active: segType == 'text',
+                                disabled: seg == null,
+                                onTap: () {
+                                  if (seg == null) return;
+                                  setState(() { seg.type = 'text'; seg.filled = false; });
+                                  c.forceUpdate(); c.pushHistory();
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
                               message: 'Type: None',
                               child: EditorIconButton(
                                 icon: Icons.visibility_off,
-                                color: Colors.grey,
+                                color: kToolColor,
                                 active: segType == 'none',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1195,7 +1288,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Round',
                               child: EditorIconButton(
                                 icon: Icons.circle_outlined,
-                                color: const Color(0xFFF97316),
+                                color: kToolColor,
                                 active: cap == 'round',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1210,7 +1303,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Square',
                               child: EditorIconButton(
                                 icon: Icons.square_outlined,
-                                color: const Color(0xFFF97316),
+                                color: kToolColor,
                                 active: cap == 'square',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1225,7 +1318,7 @@ class _EditorScreenState extends State<EditorScreen> {
                               message: 'Butt',
                               child: EditorIconButton(
                                 icon: Icons.remove,
-                                color: const Color(0xFFF97316),
+                                color: kToolColor,
                                 active: cap == 'butt',
                                 disabled: seg == null,
                                 onTap: () {
@@ -1258,7 +1351,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                 message: 'Replace Image',
                                 child: EditorIconButton(
                                   icon: Icons.image_search,
-                                  color: const Color(0xFF10B981),
+                                  color: kToolColor,
                                   onTap: () async {
                                     try {
                                       final result = await FilePicker.pickFiles(
@@ -1371,7 +1464,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                 icon: c.pointModes[c.selectedPointIndex] == 'static'
                                     ? Icons.lock
                                     : Icons.lock_open,
-                                color: const Color(0xFF2563EB),
+                                color: kToolColor,
                                 active: c.pointModes[c.selectedPointIndex] == 'static',
                                 onTap: () => c.togglePointMode(c.selectedPointIndex!),
                               ),
@@ -1399,6 +1492,17 @@ class _EditorScreenState extends State<EditorScreen> {
                               disabled: !canFlip,
                               onTap: _layerDown,
                             ),
+                            if (seg != null && seg.type == 'text') ...[
+                              const SizedBox(height: 4),
+                              Tooltip(
+                                message: 'Edit Text',
+                                child: EditorIconButton(
+                                  icon: Icons.edit_note,
+                                  color: kToolColor,
+                                  onTap: () => _editTextSegment(c, seg),
+                                ),
+                              ),
+                            ],
                           ],
                         );
                       }
@@ -1421,7 +1525,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   if (c.isAnimateMode)
                     EditorIconButton(
                       icon: Icons.grid_view_outlined,
-                      color: const Color(0xFF22C55E),
+                      color: kToolColor,
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => FramesScreen(controller: c),
@@ -1431,25 +1535,25 @@ class _EditorScreenState extends State<EditorScreen> {
                   if (c.isAnimateMode)
                     EditorIconButton(
                       icon: Icons.settings,
-                      color: const Color(0xFF0EA5E9),
+                      color: kToolColor,
                       active: _rightTab == _RightTab.settings,
                       onTap: () => _openRightTab(_RightTab.settings),
                     ),
                   EditorIconButton(
                     icon: Icons.tune,
-                    color: const Color(0xFF9333EA),
+                    color: kToolColor,
                     active: _rightTab == _RightTab.inspector,
                     onTap: () => _openRightTab(_RightTab.inspector),
                   ),
                   EditorIconButton(
                     icon: Icons.layers,
-                    color: const Color(0xFF0D9488),
+                    color: kToolColor,
                     active: _rightTab == _RightTab.layers,
                     onTap: () => _openRightTab(_RightTab.layers),
                   ),
                   EditorIconButton(
                     icon: Icons.delete,
-                    color: const Color(0xFFEF4444),
+                    color: kToolColor,
                     onTap: _handleReset,
                   ),
                 ],
@@ -1524,6 +1628,55 @@ class _EditorScreenState extends State<EditorScreen> {
                       },
                     ),
                     _MenuItem(
+                      icon: c.snapEnabled ? Icons.grid_on : Icons.grid_off,
+                      label: c.snapEnabled ? 'Snap: On' : 'Snap: Off',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        widget.controller.toggleSnap();
+                        _showSnack(c.snapEnabled ? 'Snap on' : 'Snap off');
+                      },
+                    ),
+                    _MenuItem(
+                      icon: Icons.play_circle_outline,
+                      label: 'Preview',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        _openPreview();
+                      },
+                    ),
+                    _MenuItem(
+                      icon: Icons.gif_box_outlined,
+                      label: 'Export GIF',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        _exportGif();
+                      },
+                    ),
+                    _MenuItem(
+                      icon: Icons.burst_mode,
+                      label: 'Export PNG Frames',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        _exportPngZip();
+                      },
+                    ),
+                    _MenuItem(
+                      icon: Icons.animation,
+                      label: 'Export Lottie',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        _exportLottie();
+                      },
+                    ),
+                    _MenuItem(
+                      icon: Icons.collections_bookmark,
+                      label: 'Poses',
+                      onTap: () {
+                        setState(() => _showMenu = false);
+                        _openPoseLibrary();
+                      },
+                    ),
+                    _MenuItem(
                       icon: Icons.add,
                       label: 'Zoom In',
                       onTap: () {
@@ -1554,6 +1707,302 @@ class _EditorScreenState extends State<EditorScreen> {
 
         ],
       ),
+    );
+  }
+
+  Future<void> _editTextSegment(EditorController c, Segment seg) async {
+    final textController = TextEditingController(text: seg.text ?? '');
+    final sizeController =
+        TextEditingController(text: seg.textSize.toStringAsFixed(0));
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF17191E),
+        title: const Text('Edit Text', style: TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: textController,
+                autofocus: true,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Type something…',
+                  hintStyle: TextStyle(color: Colors.white38),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.lightBlueAccent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: sizeController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Size',
+                  labelStyle: TextStyle(color: Colors.white38),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.lightBlueAccent),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(ctx).pop('ok'),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (result == 'ok') {
+      final text = textController.text.trim();
+      setState(() {
+        seg.text = text.isEmpty ? 'Text' : text;
+        final size = double.tryParse(sizeController.text);
+        seg.textSize = (size == null || size <= 0) ? 32 : size;
+      });
+      c.forceUpdate();
+      c.pushHistory();
+    }
+    textController.dispose();
+    sizeController.dispose();
+  }
+
+  void _openPreview() {
+    final c = widget.controller;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FigurePreviewScreen(
+          figure: c.figure,
+          animation: c.currentAnimation,
+          fps: c.figure.fps <= 0 ? 12 : c.figure.fps,
+          initialTime: c.currentTime,
+        ),
+      ),
+    );
+  }
+
+  void _exportGif() {
+    final c = widget.controller;
+    _exportOptions(
+      title: 'Export GIF',
+      fields: const [_ExportOption.fps(), _ExportOption.scale()],
+      loop: true,
+    ).then((opts) {
+      if (opts == null) return;
+      _runExport(
+        label: 'Rendering GIF…',
+        job: () => FigureExport(c.figure, animation: c.currentAnimation)
+            .renderGif(
+          fps: opts.fps,
+          scale: opts.scale,
+          loop: opts.loop,
+        ),
+        fileName: 'animation.gif',
+        extensions: const ['gif'],
+      );
+    });
+  }
+
+  void _exportPngZip() {
+    final c = widget.controller;
+    _exportOptions(
+      title: 'Export PNG Frames',
+      fields: const [_ExportOption.scale()],
+    ).then((opts) {
+      if (opts == null) return;
+      _runExport(
+        label: 'Rendering PNG frames…',
+        job: () => FigureExport(c.figure, animation: c.currentAnimation)
+            .renderPngZip(scale: opts.scale),
+        fileName: 'frames.zip',
+        extensions: const ['zip'],
+      );
+    });
+  }
+
+  void _exportLottie() {
+    final c = widget.controller;
+    _showSnack('Building Lottie…');
+    exportLottieJson(c.figure, c.currentAnimation).then((json) {
+      final bytes = utf8.encode(json);
+      FilePicker.saveFile(
+        bytes: bytes,
+        fileName: 'animation.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        dialogTitle: 'Export Lottie',
+      )
+          .then((path) {
+        if (path != null) _showSnack('Lottie saved');
+      });
+    }).catchError((_) {
+      if (mounted) _showSnack('Lottie export failed');
+    });
+  }
+
+  Future<_ExportOptions?> _exportOptions({
+    required String title,
+    required List<_ExportOption> fields,
+    bool loop = false,
+  }) async {
+    var fps = 12.0;
+    var scale = 2.0;
+    var loopVal = loop;
+    final controllers = {
+      'fps': TextEditingController(text: '12'),
+      'scale': TextEditingController(text: '2'),
+    };
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF17191E),
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final field in fields)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: StatefulBuilder(
+                    builder: (ctx, setStateLocal) => TextField(
+                      controller: controllers[field.key],
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: field.label,
+                        labelStyle: const TextStyle(color: Colors.white38),
+                        enabledBorder: const OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.white24),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.lightBlueAccent),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (loop)
+                StatefulBuilder(
+                  builder: (ctx, setStateLocal) => Row(
+                    children: [
+                      const Text('Loop',
+                          style: TextStyle(color: Colors.white)),
+                      const Spacer(),
+                      Switch(
+                        value: loopVal,
+                        onChanged: (v) =>
+                            setState(() => loopVal = v),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Export'),
+          ),
+        ],
+      ),
+    );
+    final fpsText = controllers['fps']?.text;
+    final scaleText = controllers['scale']?.text;
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+    if (result != true) return null;
+    fps = double.tryParse(fpsText ?? '') ?? 12;
+    if (fps <= 0 || fps > 60) fps = 12;
+    scale = double.tryParse(scaleText ?? '') ?? 2;
+    if (scale <= 0 || scale > 8) scale = 2;
+    return _ExportOptions(fps: fps, scale: scale, loop: loopVal);
+  }
+
+  void _runExport({
+    required String label,
+    required Future<Uint8List> Function() job,
+    required String fileName,
+    required List<String> extensions,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            job().then((bytes) {
+              if (ctx.mounted) Navigator.of(ctx).pop();
+              FilePicker.saveFile(
+                bytes: bytes,
+                fileName: fileName,
+                type: FileType.custom,
+                allowedExtensions: extensions,
+                dialogTitle: 'Export',
+              )
+                  .then((path) {
+                if (path != null) {
+                  // ignore: use_build_context_synchronously
+                  if (mounted) _showSnack('$fileName saved');
+                }
+              });
+            }).catchError((_) {
+              if (ctx.mounted) Navigator.of(ctx).pop();
+              if (mounted) _showSnack('Export failed');
+            });
+            return AlertDialog(
+              backgroundColor: const Color(0xFF17191E),
+              content: Row(
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(label, style: const TextStyle(color: Colors.white)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openPoseLibrary() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return PoseLibrarySheet(controller: widget.controller);
+      },
     );
   }
 

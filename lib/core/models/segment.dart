@@ -88,6 +88,12 @@ class Segment {
   bool filled;
   double? controlDX;
   double? controlDY;
+  bool isCollision; // game-dev flag: this part participates in collision
+
+  /// Text shown by a `text` segment (rendered at the segment midpoint and
+  /// rotated along the segment angle so it can be animated by its points).
+  String? text;
+  double textSize;
 
   static int _counter = 0;
 
@@ -97,7 +103,7 @@ class Segment {
         point2Index = 1,
         color = '#000000',
         fillColor = null,
-        width = 16,
+        width = 10,
         lineCap = 'round',
         lineJoin = 'round',
         layer = 0,
@@ -115,7 +121,10 @@ class Segment {
         shapeClosed = true,
         filled = false,
         controlDX = null,
-        controlDY = null;
+        controlDY = null,
+        isCollision = false,
+        text = null,
+        textSize = 32;
 
   String? get imageData {
     if (imageDataList.isEmpty) return null;
@@ -142,6 +151,7 @@ class Segment {
   bool get isCircle => type == 'circle';
   bool get isImage => type == 'image';
   bool get isNone => type == 'none';
+  bool get isText => type == 'text';
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -169,6 +179,9 @@ class Segment {
         'filled': filled,
         'controlDX': controlDX,
         'controlDY': controlDY,
+        'isCollision': isCollision,
+        'text': text,
+        'textSize': textSize,
       };
 
   factory Segment.fromJson(Map<String, dynamic> data) {
@@ -203,6 +216,9 @@ class Segment {
     seg.filled = data['filled'] as bool? ?? (seg.type != 'circle' && seg.type != 'none');
     seg.controlDX = (data['controlDX'] as num?)?.toDouble();
     seg.controlDY = (data['controlDY'] as num?)?.toDouble();
+    seg.isCollision = data['isCollision'] as bool? ?? false;
+    seg.text = data['text'] as String?;
+    seg.textSize = (data['textSize'] as num?)?.toDouble() ?? 32;
     return seg;
   }
 
