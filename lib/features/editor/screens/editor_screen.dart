@@ -52,8 +52,6 @@ class _EditorScreenState extends State<EditorScreen> {
   String _lastTransformKey = 'moveAll';
   int _sideTab = 0; // 0 = drawing/segment, 1 = utility
 
-
-
   //--------------------------------------------------------------------------
   // Actions
   //--------------------------------------------------------------------------
@@ -103,10 +101,10 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   EditorTool _modifyTool(String key) => switch (key) {
-        'modify' => EditorTool.modify,
-        'curve' => EditorTool.curve,
-        _ => EditorTool.point,
-      };
+    'modify' => EditorTool.modify,
+    'curve' => EditorTool.curve,
+    _ => EditorTool.point,
+  };
 
   /// Transform group: move all / rotate all / scale all mapping.
   bool _isTransformTool(EditorTool t) =>
@@ -127,16 +125,10 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   EditorTool _transformTool(String key) => switch (key) {
-        'rotateAll' => EditorTool.rotateAll,
-        'scaleAll' => EditorTool.stretch,
-        _ => EditorTool.select,
-      };
-
-
-
-
-
-
+    'rotateAll' => EditorTool.rotateAll,
+    'scaleAll' => EditorTool.stretch,
+    _ => EditorTool.select,
+  };
 
   void _layerDown() {
     final c = widget.controller;
@@ -160,8 +152,6 @@ class _EditorScreenState extends State<EditorScreen> {
     c.forceUpdate();
   }
 
-
-
   Future<void> _handleAddFigure(ProjectMeta meta) async {
     final c = widget.controller;
     try {
@@ -178,7 +168,9 @@ class _EditorScreenState extends State<EditorScreen> {
       final base = c.figure.points.length;
       for (var i = 0; i < srcPts.length; i++) {
         indexMap[i] = base + i;
-        c.figure.points.add(Point2(srcPts[i].x + offsetX, srcPts[i].y + offsetY));
+        c.figure.points.add(
+          Point2(srcPts[i].x + offsetX, srcPts[i].y + offsetY),
+        );
       }
       final roots = c.figure.rootIndices;
       final newRoots = <int>[];
@@ -189,32 +181,105 @@ class _EditorScreenState extends State<EditorScreen> {
         if (!roots.contains(mapped)) roots.add(mapped);
       }
       if (c.isAnimateMode) {
+        final authoredTimes = c.authoredFrameTimes();
         for (final r in newRoots) {
-          if (c.currentTime > 0.001) {
-            c.figure.setFigureVisibility(r, 0, false);
+          final t = c.currentTime.roundToDouble();
+          c.figure.setFigureVisibility(r, 0.0, false);
+          if (t > 0.001) {
+            c.figure.setFigureVisibility(
+              r,
+              t,
+              true,
+              authoredTimes: authoredTimes,
+            );
+          } else {
+            c.figure.setFigureVisibility(r, 0.0, true);
+            final next = authoredTimes
+                .where((at) => at.roundToDouble() > 0.0)
+                .fold<double?>(null, (p, at) {
+                  final rt = at.roundToDouble();
+                  return p == null || rt < p ? rt : p;
+                });
+            if (next != null) {
+              c.figure.visibility
+                  .putIfAbsent(r.toString(), () => [])
+                  .removeWhere((kf) => (kf.time - next).abs() < 0.001);
+              c.figure.visibility[r.toString()]!.add(
+                VisibilityKeyframe(next, false),
+              );
+              c.figure.visibility[r.toString()]!.sort(
+                (a, b) => a.time.compareTo(b.time),
+              );
+            }
           }
-          c.figure.setFigureVisibility(r, c.currentTime, true);
         }
       }
+      final segIdMap = <String, String>{};
       for (final s in src.segments) {
         final p1 = indexMap[s.point1Index];
         final p2 = indexMap[s.point2Index];
         if (p1 == null || p2 == null) continue;
         final ns = s.clone();
+        // A pasted figure/preset must not share segment ids with the source
+        // project; per-frame overrides are keyed by id, so give it fresh ones.
+        final newId = Segment(ns.type).id;
+        segIdMap[s.id] = newId;
+        ns.id = newId;
         ns.point1Index = p1;
         ns.point2Index = p2;
         ns.layer = (ns.layer) + c.figure.segments.length;
         c.figure.segments.add(ns);
       }
+      src.remappedAttachedSegments(segIdMap, indexMap).forEach((joint, ids) {
+        c.figure.attachedSegments[joint] = ids;
+      });
       src.cycleFills.forEach((key, entry) {
-        final parts = key.split(',').map(int.tryParse).whereType<int>().toList();
+        final parts = key
+            .split(',')
+            .map(int.tryParse)
+            .whereType<int>()
+            .toList();
         if (parts.length < 2) return;
         final mapped = parts.map((p) => indexMap[p]).whereType<int>().toList();
         if (mapped.length != parts.length) return;
         mapped.sort();
         c.figure.cycleFills[mapped.join(',')] = entry.clone();
       });
-      c.mergeGroupsFrom(src);
+      String? remapOverrideKey(String key) {
+        final parts = key.split(':');
+        if (parts.length >= 3 && parts[0] == 'seg') {
+          final newId = segIdMap[parts[1]];
+          if (newId == null) return null;
+          return ['seg', newId, ...parts.skip(2)].join(':');
+        }
+        if (parts.length >= 3 && parts[0] == 'cycle') {
+          final ids = parts[1]
+              .split(',')
+              .map(int.tryParse)
+              .whereType<int>()
+              .toList();
+          final mapped = ids.map((p) => indexMap[p]).whereType<int>().toList();
+          if (mapped.length != ids.length) return null;
+          mapped.sort();
+          return ['cycle', mapped.join(','), ...parts.skip(2)].join(':');
+        }
+        return key;
+      }
+
+      src.frameOverrides.forEach((frame, values) {
+        final mapped = <String, dynamic>{};
+        values.forEach((key, value) {
+          final newKey = remapOverrideKey(key.toString());
+          if (newKey != null) mapped[newKey] = value;
+        });
+        if (mapped.isNotEmpty) {
+          c.figure.frameOverrides[frame] = Map<String, dynamic>.from(
+            c.figure.frameOverrides[frame] ?? {},
+          )..addAll(mapped);
+        }
+      });
+      c.recordPointsAtCurrentFrame(indexMap.values);
+      c.mergeGroupsFrom(src, segIdMap);
       c.forceUpdate();
       c.pushHistory();
     } catch (_) {
@@ -224,11 +289,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _showSnack(String message) {
     final palette = Theme.of(context).appColors;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message, style: TextStyle(color: palette.text)),
-      backgroundColor: palette.backgroundElement,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: palette.text)),
+        backgroundColor: palette.backgroundElement,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _openRightTab(_RightTab tab) {
@@ -254,9 +321,9 @@ class _EditorScreenState extends State<EditorScreen> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal memilih gambar')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Gagal memilih gambar')));
       }
     }
   }
@@ -346,7 +413,9 @@ class _EditorScreenState extends State<EditorScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
-              "ADD FIGURE ASSET",
+              c.isAnimateMode
+                  ? "ADD FIGURE / PRESET ASSET"
+                  : "ADD FIGURE ASSET",
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: 10,
@@ -359,22 +428,43 @@ class _EditorScreenState extends State<EditorScreen> {
               future: Future.wait([
                 ProjectStorage.listGroups(ProjectType.figure),
                 ProjectStorage.listProjects(ProjectType.figure),
+                ProjectStorage.listGroups(ProjectType.preset),
+                ProjectStorage.listProjects(ProjectType.preset),
               ]),
               builder: (ctx, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final data = snapshot.data ?? [[], []];
-                final groups = List<ProjectGroup>.from(data[0] as List);
-                final projects = List<ProjectMeta>.from(data[1] as List);
-                final filtered = projects.where((p) => p.id != c.projectId).toList();
+                final data = snapshot.data ?? [[], [], [], []];
+                final figureGroups = List<ProjectGroup>.from(data[0] as List);
+                final groups = <ProjectGroup>[
+                  ...figureGroups,
+                  ...List<ProjectGroup>.from(
+                    data[2] as List,
+                  ).where((g) => !figureGroups.any((f) => f.id == g.id)),
+                ];
+                final projects = <ProjectMeta>[
+                  ...List<ProjectMeta>.from(data[1] as List),
+                  // Animation (and Preset) scenes can re-create objects by
+                  // importing a preset at the current frame.
+                  if (c.isAnimateMode)
+                    ...List<ProjectMeta>.from(data[3] as List),
+                ];
+                final filtered = projects
+                    .where((p) => p.id != c.projectId)
+                    .toList();
                 if (filtered.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
-                        "No other figures found",
-                        style: TextStyle(color: palette.textSecondary, fontSize: 12),
+                        c.isAnimateMode
+                            ? "No figures or presets found"
+                            : "No other figures found",
+                        style: TextStyle(
+                          color: palette.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   );
@@ -392,36 +482,66 @@ class _EditorScreenState extends State<EditorScreen> {
                   if (groupProjects.isEmpty) continue;
                   displayGroups.add(
                     Theme(
-                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
                         title: Text(
                           group.name,
-                          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            color: palette.text,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
-                        leading: Icon(Icons.folder, color: palette.textSecondary, size: 18),
+                        leading: Icon(
+                          Icons.folder,
+                          color: palette.textSecondary,
+                          size: 18,
+                        ),
                         childrenPadding: const EdgeInsets.only(left: 16),
                         initiallyExpanded: true,
-                        children: groupProjects.map((p) => _buildFigureListTile(p, palette)).toList(),
+                        children: groupProjects
+                            .map((p) => _buildFigureListTile(p, palette))
+                            .toList(),
                       ),
                     ),
                   );
                 }
 
                 final activeGroupIds = groups.map((g) => g.id).toSet();
-                final ungroupedProjects = filtered.where((p) => p.groupId == null || !activeGroupIds.contains(p.groupId)).toList();
+                final ungroupedProjects = filtered
+                    .where(
+                      (p) =>
+                          p.groupId == null ||
+                          !activeGroupIds.contains(p.groupId),
+                    )
+                    .toList();
                 if (ungroupedProjects.isNotEmpty) {
                   displayGroups.add(
                     Theme(
-                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
                         title: Text(
                           "Default / Ungrouped",
-                          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            color: palette.text,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
-                        leading: Icon(Icons.folder_open, color: palette.textSecondary, size: 18),
+                        leading: Icon(
+                          Icons.folder_open,
+                          color: palette.textSecondary,
+                          size: 18,
+                        ),
                         childrenPadding: const EdgeInsets.only(left: 16),
                         initiallyExpanded: true,
-                        children: ungroupedProjects.map((p) => _buildFigureListTile(p, palette)).toList(),
+                        children: ungroupedProjects
+                            .map((p) => _buildFigureListTile(p, palette))
+                            .toList(),
                       ),
                     ),
                   );
@@ -454,6 +574,7 @@ class _EditorScreenState extends State<EditorScreen> {
           style: TextStyle(color: palette.text, fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
+          "${meta.type == ProjectType.preset ? 'Preset' : 'Figure'} · "
           "ID: ${meta.id.substring(0, math.min(8, meta.id.length))}...",
           style: TextStyle(color: palette.textSecondary, fontSize: 11),
         ),
@@ -518,8 +639,8 @@ class _EditorScreenState extends State<EditorScreen> {
                     tab == _RightTab.inspector
                         ? "Properties"
                         : tab == _RightTab.settings
-                            ? "Animation Settings"
-                            : "Layers",
+                        ? "Animation Settings"
+                        : "Layers",
                     style: TextStyle(
                       color: palette.text,
                       fontSize: 14,
@@ -556,15 +677,20 @@ class _EditorScreenState extends State<EditorScreen> {
       listenable: c,
       builder: (context, _) {
         final palette = Theme.of(context).appColors;
-        final canFlip = c.selectedSegmentId != null &&
+        final canFlip =
+            c.selectedSegmentId != null &&
             c.figure.getSegment(c.selectedSegmentId!) != null;
         return _buildScaffold(context, c, palette, canFlip);
       },
     );
   }
 
-  Widget _buildScaffold(BuildContext context, EditorController c,
-      AppPalette palette, bool canFlip) {
+  Widget _buildScaffold(
+    BuildContext context,
+    EditorController c,
+    AppPalette palette,
+    bool canFlip,
+  ) {
     final pad = MediaQuery.paddingOf(context);
     return Scaffold(
       key: _scaffoldKey,
@@ -601,7 +727,11 @@ class _EditorScreenState extends State<EditorScreen> {
                         child: InkWell(
                           onTap: widget.onBack,
                           borderRadius: BorderRadius.circular(16),
-                          child: Icon(Icons.arrow_back, size: 18, color: palette.text),
+                          child: Icon(
+                            Icons.arrow_back,
+                            size: 18,
+                            color: palette.text,
+                          ),
                         ),
                       ),
                     ),
@@ -632,7 +762,8 @@ class _EditorScreenState extends State<EditorScreen> {
                           EditorIconButton(
                             icon: Icons.create_new_folder,
                             color: kToolColor,
-                            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                            onTap: () =>
+                                _scaffoldKey.currentState?.openDrawer(),
                           ),
                           const SizedBox(width: 4),
                           EditorIconButton(
@@ -665,17 +796,20 @@ class _EditorScreenState extends State<EditorScreen> {
                       ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
-                              icon: Icons.open_with,
-                              key: 'point',
-                              color: kToolColor),
+                            icon: Icons.open_with,
+                            key: 'point',
+                            color: kToolColor,
+                          ),
                           ToolGroupSub(
-                              icon: Icons.center_focus_strong,
-                              key: 'modify',
-                              color: kToolColor),
+                            icon: Icons.center_focus_strong,
+                            key: 'modify',
+                            color: kToolColor,
+                          ),
                           ToolGroupSub(
-                              icon: Icons.timeline,
-                              key: 'curve',
-                              color: kToolColor),
+                            icon: Icons.timeline,
+                            key: 'curve',
+                            color: kToolColor,
+                          ),
                         ],
                         selectedKey: _modifyKey(c.activeTool),
                         onSelect: (k) {
@@ -683,7 +817,8 @@ class _EditorScreenState extends State<EditorScreen> {
                           c.setTool(_modifyTool(k));
                         },
                         active: _isModifyTool(c.activeTool),
-                        onActivate: () => c.setTool(_modifyTool(_lastModifyKey)),
+                        onActivate: () =>
+                            c.setTool(_modifyTool(_lastModifyKey)),
                         placement: ToolGroupPlacement.bottom,
                       ),
                       const SizedBox(width: 4),
@@ -691,17 +826,20 @@ class _EditorScreenState extends State<EditorScreen> {
                       ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
-                              icon: Icons.near_me,
-                              key: 'moveAll',
-                              color: kToolColor),
+                            icon: Icons.near_me,
+                            key: 'moveAll',
+                            color: kToolColor,
+                          ),
                           ToolGroupSub(
-                              icon: Icons.rotate_left,
-                              key: 'rotateAll',
-                              color: kToolColor),
+                            icon: Icons.rotate_left,
+                            key: 'rotateAll',
+                            color: kToolColor,
+                          ),
                           ToolGroupSub(
-                              icon: Icons.compress,
-                              key: 'scaleAll',
-                              color: kToolColor),
+                            icon: Icons.compress,
+                            key: 'scaleAll',
+                            color: kToolColor,
+                          ),
                         ],
                         selectedKey: _transformKey(c.activeTool),
                         onSelect: (k) {
@@ -709,13 +847,14 @@ class _EditorScreenState extends State<EditorScreen> {
                           c.setTool(_transformTool(k));
                         },
                         active: _isTransformTool(c.activeTool),
-                        onActivate: () => c.setTool(_transformTool(_lastTransformKey)),
+                        onActivate: () =>
+                            c.setTool(_transformTool(_lastTransformKey)),
                         placement: ToolGroupPlacement.bottom,
                       ),
                     ],
                   ),
                 ),
- 
+
                 // Right: Animation transport capsule (prev/next) OR Scene Mode capsule + More (zoom) menu.
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -760,7 +899,11 @@ class _EditorScreenState extends State<EditorScreen> {
                         child: InkWell(
                           onTap: () => setState(() => _showMenu = !_showMenu),
                           borderRadius: BorderRadius.circular(16),
-                          child: Icon(Icons.more_horiz, size: 18, color: palette.text),
+                          child: Icon(
+                            Icons.more_horiz,
+                            size: 18,
+                            color: palette.text,
+                          ),
                         ),
                       ),
                     ),
@@ -777,277 +920,337 @@ class _EditorScreenState extends State<EditorScreen> {
             child: c.isAnimateMode
                 ? OverlayCapsule(
                     padding: const EdgeInsets.all(4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Tooltip(
-                          message: 'Permanent Delete',
-                          child: EditorIconButton(
-                            icon: Icons.delete_forever,
-                            color: kToolColor,
-                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
-                            onTap: () {
-                              final ptIdx = c.selectedPointIndex ??
-                                  (c.selectedSegmentId != null
-                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
-                                      : null);
-                              if (ptIdx != null) {
-                                final comp = c.figure.connectedComponent(ptIdx);
-                                final root = c.figure.rootIndices.firstWhere(
-                                  (r) => comp.contains(r),
-                                  orElse: () => -1,
-                                );
-                                if (root != -1) {
-                                  c.removeFigureAt(root);
+                    child: SizedBox(
+                      width: 72,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          Tooltip(
+                            message: 'Permanent Delete',
+                            child: EditorIconButton(
+                              icon: Icons.delete_forever,
+                              color: kToolColor,
+                              disabled:
+                                  c.selectedPointIndex == null &&
+                                  c.selectedSegmentId == null,
+                              onTap: () {
+                                final ptIdx =
+                                    c.selectedPointIndex ??
+                                    (c.selectedSegmentId != null
+                                        ? c.figure
+                                              .getSegment(c.selectedSegmentId!)
+                                              ?.point1Index
+                                        : null);
+                                if (ptIdx != null) {
+                                  final comp = c.figure.connectedComponent(
+                                    ptIdx,
+                                  );
+                                  final root = c.figure.rootIndices.firstWhere(
+                                    (r) => comp.contains(r),
+                                    orElse: () => -1,
+                                  );
+                                  if (root != -1) {
+                                    c.removeFigureAt(root);
+                                  }
                                 }
-                              }
-                            },
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Tooltip(
-                          message: 'Attach Figure',
-                          child: EditorIconButton(
-                            icon: Icons.link,
-                            color: kToolColor,
-                            active: c.activeTool == EditorTool.attach,
-                            onTap: () {
-                              c.setTool(c.activeTool == EditorTool.attach
-                                  ? EditorTool.rotate
-                                  : EditorTool.attach);
-                            },
+                          Tooltip(
+                            message: 'Attach Figure',
+                            child: EditorIconButton(
+                              icon: Icons.link,
+                              color: kToolColor,
+                              active: c.activeTool == EditorTool.attach,
+                              onTap: () {
+                                c.setTool(
+                                  c.activeTool == EditorTool.attach
+                                      ? EditorTool.rotate
+                                      : EditorTool.attach,
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(height: 1, width: 24, color: palette.border),
-                        const SizedBox(height: 8),
-                        Tooltip(
-                          message: 'Center Figure',
-                          child: EditorIconButton(
-                            icon: Icons.filter_center_focus,
-                            color: kToolColor,
-                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
-                            onTap: () {
-                              final ptIdx = c.selectedPointIndex ??
-                                  (c.selectedSegmentId != null
-                                      ? c.figure.getSegment(c.selectedSegmentId!)?.point1Index
-                                      : null);
-                              if (ptIdx != null) {
-                                c.centerFigureAt(ptIdx);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Tooltip(
-                          message: 'Toggle Visibility',
-                          child: EditorIconButton(
-                            icon: Icons.visibility,
-                            color: kToolColor,
-                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
-                            onTap: () {
-                              final ptIdx = c.selectedFigurePoint();
-                              if (ptIdx != null) {
-                                c.toggleFigureVisibility(ptIdx);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Tooltip(
-                          message: 'Opacity',
-                          child: EditorIconButton(
-                            icon: Icons.opacity,
-                            color: kToolColor,
-                            disabled: c.selectedPointIndex == null && c.selectedSegmentId == null,
-                            onTap: () {
-                              final ptIdx = c.selectedFigurePoint();
-                              if (ptIdx != null) {
-                                _showOpacitySlider(c, ptIdx);
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Builder(builder: (btnCtx) {
-                          final ptIdx = c.selectedFigurePoint();
-                          final hasSelection = ptIdx != null &&
-                              ptIdx >= 0 &&
-                              ptIdx < c.figure.points.length;
-                          final cur = hasSelection
-                              ? c.figureColorOverrideAt(ptIdx)
-                              : null;
-                          return Tooltip(
-                            message: hasSelection
-                                ? (cur != null
-                                    ? 'Figure Color (tap to change, long-press to clear)'
-                                    : 'Figure Color')
-                                : 'Figure Color',
-                            child: GestureDetector(
-                              onLongPress: hasSelection
-                                  ? () => c.clearFigureColorOverride(ptIdx)
-                                  : null,
-                              child: ColorCircle(
-                                color: parseHexColor(cur) ??
-                                    const Color(0xFF8B5CF6),
-                                disabled: !hasSelection,
-                                onTap: hasSelection
-                                    ? () async {
-                                        final Color? picked =
-                                            await showColorPickerSheet(
-                                                btnCtx,
-                                                parseHexColor(cur) ??
-                                                    const Color(0xFF8B5CF6));
-                                        if (picked != null) {
-                                          c.setFigureColorOverride(
-                                              ptIdx, colorToHex(picked));
-                                        }
-                                      }
-                                    : null,
+                          SizedBox(
+                            width: 72,
+                            height: 1,
+                            child: Center(
+                              child: Container(
+                                height: 1,
+                                width: 48,
+                                color: palette.border,
                               ),
                             ),
-                          );
-                        }),
-                        const SizedBox(height: 4),
-                        Builder(builder: (btnCtx) {
-                          final ptIdx = c.selectedFigurePoint();
-                          final hasSelection = ptIdx != null &&
-                              ptIdx >= 0 &&
-                              ptIdx < c.figure.points.length;
-                          final isCol = hasSelection &&
-                              c.isFigureCollision(ptIdx);
-                          return Tooltip(
-                            message: hasSelection
-                                ? (isCol
-                                    ? 'Collision: ON (tap to disable)'
-                                    : 'Collision: OFF (tap to enable)')
-                                : 'Collision (select a figure)',
+                          ),
+                          Tooltip(
+                            message: 'Center Figure',
                             child: EditorIconButton(
-                              icon: Icons.shield_outlined,
+                              icon: Icons.filter_center_focus,
                               color: kToolColor,
-                              active: isCol,
-                              disabled: !hasSelection,
-                              onTap: hasSelection
-                                  ? () => c.toggleFigureCollision(ptIdx)
-                                  : null,
+                              disabled:
+                                  c.selectedPointIndex == null &&
+                                  c.selectedSegmentId == null,
+                              onTap: () {
+                                final ptIdx =
+                                    c.selectedPointIndex ??
+                                    (c.selectedSegmentId != null
+                                        ? c.figure
+                                              .getSegment(c.selectedSegmentId!)
+                                              ?.point1Index
+                                        : null);
+                                if (ptIdx != null) {
+                                  c.centerFigureAt(ptIdx);
+                                }
+                              },
                             ),
-                          );
-                        }),
-                        const SizedBox(height: 4),
-                        Builder(builder: (btnCtx) {
-                          final seg = c.selectedSegmentId != null
-                              ? c.figure.getSegment(c.selectedSegmentId!)
-                              : null;
-                          final isImg = seg != null && seg.type == 'image';
-                          return Tooltip(
-                            message: isImg
-                                ? 'Replace Image Asset'
-                                : 'Replace Image (select an image segment)',
+                          ),
+                          Tooltip(
+                            message: 'Toggle Visibility',
                             child: EditorIconButton(
-                              icon: Icons.image_search,
+                              icon: Icons.visibility,
                               color: kToolColor,
-                              disabled: !isImg,
-                              onTap: isImg
-                                  ? () async {
-                                      try {
-                                        final result = await FilePicker.pickFiles(
-                                          type: FileType.image,
-                                          withData: true,
-                                        );
-                                        if (result != null &&
-                                            result.files.isNotEmpty) {
-                                          final bytes = result.files.first.bytes;
-                                          if (bytes != null) {
-                                            final ext = result.files.first
-                                                    .extension ??
-                                                'png';
-                                            final b64 = base64Encode(bytes);
-                                            c.swapSegmentImage(
-                                              seg.id,
-                                              'data:image/$ext;base64,$b64',
+                              disabled:
+                                  c.selectedPointIndex == null &&
+                                  c.selectedSegmentId == null,
+                              onTap: () {
+                                final ptIdx = c.selectedFigurePoint();
+                                if (ptIdx != null) {
+                                  c.toggleFigureVisibility(ptIdx);
+                                }
+                              },
+                            ),
+                          ),
+                          Tooltip(
+                            message: 'Opacity',
+                            child: EditorIconButton(
+                              icon: Icons.opacity,
+                              color: kToolColor,
+                              disabled:
+                                  c.selectedPointIndex == null &&
+                                  c.selectedSegmentId == null,
+                              onTap: () {
+                                final ptIdx = c.selectedFigurePoint();
+                                if (ptIdx != null) {
+                                  _showOpacitySlider(c, ptIdx);
+                                }
+                              },
+                            ),
+                          ),
+                          Builder(
+                            builder: (btnCtx) {
+                              final ptIdx = c.selectedFigurePoint();
+                              final hasSelection =
+                                  ptIdx != null &&
+                                  ptIdx >= 0 &&
+                                  ptIdx < c.figure.points.length;
+                              final cur = hasSelection
+                                  ? c.figureColorOverrideAt(ptIdx)
+                                  : null;
+                              return Tooltip(
+                                message: hasSelection
+                                    ? (cur != null
+                                          ? 'Figure Color (tap to change, long-press to clear)'
+                                          : 'Figure Color')
+                                    : 'Figure Color',
+                                child: GestureDetector(
+                                  onLongPress: hasSelection
+                                      ? () => c.clearFigureColorOverride(ptIdx)
+                                      : null,
+                                  child: ColorCircle(
+                                    color:
+                                        parseHexColor(cur) ??
+                                        const Color(0xFF8B5CF6),
+                                    disabled: !hasSelection,
+                                    onTap: hasSelection
+                                        ? () async {
+                                            final Color? picked =
+                                                await showColorPickerSheet(
+                                                  btnCtx,
+                                                  parseHexColor(cur) ??
+                                                      const Color(0xFF8B5CF6),
+                                                );
+                                            if (picked != null) {
+                                              c.setFigureColorOverride(
+                                                ptIdx,
+                                                colorToHex(picked),
+                                              );
+                                            }
+                                          }
+                                        : null,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          Builder(
+                            builder: (btnCtx) {
+                              final ptIdx = c.selectedFigurePoint();
+                              final hasSelection =
+                                  ptIdx != null &&
+                                  ptIdx >= 0 &&
+                                  ptIdx < c.figure.points.length;
+                              final isCol =
+                                  hasSelection && c.isFigureCollision(ptIdx);
+                              return Tooltip(
+                                message: hasSelection
+                                    ? (isCol
+                                          ? 'Collision: ON (tap to disable)'
+                                          : 'Collision: OFF (tap to enable)')
+                                    : 'Collision (select a figure)',
+                                child: EditorIconButton(
+                                  icon: Icons.shield_outlined,
+                                  color: kToolColor,
+                                  active: isCol,
+                                  disabled: !hasSelection,
+                                  onTap: hasSelection
+                                      ? () => c.toggleFigureCollision(ptIdx)
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                          Builder(
+                            builder: (btnCtx) {
+                              final seg = c.selectedSegmentId != null
+                                  ? c.figure.getSegment(c.selectedSegmentId!)
+                                  : null;
+                              final isImg = seg != null && seg.type == 'image';
+                              return Tooltip(
+                                message: isImg
+                                    ? 'Replace Image Asset'
+                                    : 'Replace Image (select an image segment)',
+                                child: EditorIconButton(
+                                  icon: Icons.image_search,
+                                  color: kToolColor,
+                                  disabled: !isImg,
+                                  onTap: isImg
+                                      ? () async {
+                                          try {
+                                            final result =
+                                                await FilePicker.pickFiles(
+                                                  type: FileType.image,
+                                                  withData: true,
+                                                );
+                                            if (result != null &&
+                                                result.files.isNotEmpty) {
+                                              final bytes =
+                                                  result.files.first.bytes;
+                                              if (bytes != null) {
+                                                final ext =
+                                                    result
+                                                        .files
+                                                        .first
+                                                        .extension ??
+                                                    'png';
+                                                final b64 = base64Encode(bytes);
+                                                c.swapSegmentImage(
+                                                  seg.id,
+                                                  'data:image/$ext;base64,$b64',
+                                                );
+                                              }
+                                            }
+                                          } catch (err) {
+                                            debugPrint(
+                                              'Error replacing image: $err',
                                             );
                                           }
                                         }
-                                      } catch (err) {
-                                        debugPrint(
-                                            'Error replacing image: $err');
-                                      }
-                                    }
-                                  : null,
-                            ),
-                          );
-                        }),
-                        const SizedBox(height: 4),
-                        Builder(builder: (btnCtx) {
-                          final seg = c.selectedSegmentId != null
-                              ? c.figure.getSegment(c.selectedSegmentId!)
-                              : null;
-                          final isSpriteImage =
-                              seg != null && seg.type == 'image' &&
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                          Builder(
+                            builder: (btnCtx) {
+                              final seg = c.selectedSegmentId != null
+                                  ? c.figure.getSegment(c.selectedSegmentId!)
+                                  : null;
+                              final isSpriteImage =
+                                  seg != null &&
+                                  seg.type == 'image' &&
                                   seg.imageDataList.length > 1;
-                          return Tooltip(
-                            message: isSpriteImage
-                                ? 'Sprite Frame (tap to cycle)'
-                                : 'Sprite Frame (select an image segment)',
-                            child: EditorIconButton(
-                              icon: Icons.photo_library,
-                              color: kToolColor,
-                              disabled: !isSpriteImage,
-                              onTap: isSpriteImage
-                                  ? () {
-                                      final curIdx = c
-                                              .figure
-                                              .getSegmentImageIndex(
-                                                  seg.id,
-                                                  c.currentTime) ??
-                                          seg.activeImageIndex;
-                                      final next =
-                                          (curIdx + 1) %
+                              return Tooltip(
+                                message: isSpriteImage
+                                    ? 'Sprite Frame (tap to cycle)'
+                                    : 'Sprite Frame (select an image segment)',
+                                child: EditorIconButton(
+                                  icon: Icons.photo_library,
+                                  color: kToolColor,
+                                  disabled: !isSpriteImage,
+                                  onTap: isSpriteImage
+                                      ? () {
+                                          final curIdx =
+                                              c.figure.getSegmentImageIndex(
+                                                seg.id,
+                                                c.currentTime,
+                                              ) ??
+                                              seg.activeImageIndex;
+                                          final next =
+                                              (curIdx + 1) %
                                               seg.imageDataList.length;
-                                      c.selectSegmentImage(seg.id, next);
-                                    }
-                                  : null,
+                                          c.selectSegmentImage(seg.id, next);
+                                        }
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                          SizedBox(
+                            width: 72,
+                            height: 1,
+                            child: Center(
+                              child: Container(
+                                height: 1,
+                                width: 48,
+                                color: palette.border,
+                              ),
                             ),
-                          );
-                        }),
-                        const SizedBox(height: 8),
-                        Container(height: 1, width: 24, color: palette.border),
-                        const SizedBox(height: 8),
-                        Tooltip(
-                          message: 'Copy Pose',
-                          child: EditorIconButton(
-                            icon: Icons.copy,
-                            color: kToolColor,
-                            onTap: () {
-                              c.copyFrame(c.currentTime);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Pose copied', style: TextStyle(color: Colors.white)),
-                                    backgroundColor: Color(0xFF22C55E),
-                                    duration: Duration(seconds: 1)),
-                              );
-                            },
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Tooltip(
-                          message: 'Paste Pose',
-                          child: EditorIconButton(
-                            icon: Icons.paste,
-                            color: kToolColor,
-                            disabled: !c.hasCopiedFrame,
-                            onTap: () {
-                              c.pasteFrame(c.currentTime);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Pose pasted', style: TextStyle(color: Colors.white)),
+                          Tooltip(
+                            message: 'Copy Pose',
+                            child: EditorIconButton(
+                              icon: Icons.copy,
+                              color: kToolColor,
+                              onTap: () {
+                                c.copyFrame(c.currentTime);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Pose copied',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                                     backgroundColor: Color(0xFF22C55E),
-                                    duration: Duration(seconds: 1)),
-                              );
-                            },
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+                          Tooltip(
+                            message: 'Paste Pose',
+                            child: EditorIconButton(
+                              icon: Icons.paste,
+                              color: kToolColor,
+                              disabled: !c.hasCopiedFrame,
+                              onTap: () {
+                                c.pasteFrame(c.currentTime);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Pose pasted',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    backgroundColor: Color(0xFF22C55E),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : Row(
@@ -1056,461 +1259,559 @@ class _EditorScreenState extends State<EditorScreen> {
                     children: [
                       // Capsule 1: Tab icons (always 5 tabs visible)
                       OverlayCapsule(
-                  padding: const EdgeInsets.all(4),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Tab 0: Draw Tools
-                      Tooltip(
-                        message: 'Draw Tools',
-                        child: EditorIconButton(
-                          icon: Icons.edit,
-                          color: kToolColor,
-                          active: _sideTab == 0,
-                          onTap: () => setState(() => _sideTab = 0),
+                        padding: const EdgeInsets.all(4),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Tab 0: Draw Tools
+                            Tooltip(
+                              message: 'Draw Tools',
+                              child: EditorIconButton(
+                                icon: Icons.edit,
+                                color: kToolColor,
+                                active: _sideTab == 0,
+                                onTap: () => setState(() => _sideTab = 0),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Tab 1: Type Tools
+                            Tooltip(
+                              message: 'Type Tools',
+                              child: EditorIconButton(
+                                icon: Icons.category,
+                                color: kToolColor,
+                                active: _sideTab == 1,
+                                onTap: () => setState(() => _sideTab = 1),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Tab 2: Linejoin Tools
+                            Tooltip(
+                              message: 'Linejoin Tools',
+                              child: EditorIconButton(
+                                icon: Icons.line_style,
+                                color: kToolColor,
+                                active: _sideTab == 2,
+                                onTap: () => setState(() => _sideTab = 2),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Tab 3: Appearance Tools
+                            Tooltip(
+                              message: 'Appearance',
+                              child: EditorIconButton(
+                                icon: Icons.palette,
+                                color: kToolColor,
+                                active: _sideTab == 3,
+                                onTap: () => setState(() => _sideTab = 3),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Tab 4: Segment Tools
+                            Tooltip(
+                              message: 'Segment Tools',
+                              child: EditorIconButton(
+                                icon: Icons.layers,
+                                color: kToolColor,
+                                active: _sideTab == 4,
+                                onTap: () => setState(() => _sideTab = 4),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      // Tab 1: Type Tools
-                      Tooltip(
-                        message: 'Type Tools',
-                        child: EditorIconButton(
-                          icon: Icons.category,
-                          color: kToolColor,
-                          active: _sideTab == 1,
-                          onTap: () => setState(() => _sideTab = 1),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Tab 2: Linejoin Tools
-                      Tooltip(
-                        message: 'Linejoin Tools',
-                        child: EditorIconButton(
-                          icon: Icons.line_style,
-                          color: kToolColor,
-                          active: _sideTab == 2,
-                          onTap: () => setState(() => _sideTab = 2),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Tab 3: Appearance Tools
-                      Tooltip(
-                        message: 'Appearance',
-                        child: EditorIconButton(
-                          icon: Icons.palette,
-                          color: kToolColor,
-                          active: _sideTab == 3,
-                          onTap: () => setState(() => _sideTab = 3),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Tab 4: Segment Tools
-                      Tooltip(
-                        message: 'Segment Tools',
-                        child: EditorIconButton(
-                          icon: Icons.layers,
-                          color: kToolColor,
-                          active: _sideTab == 4,
-                          onTap: () => setState(() => _sideTab = 4),
+                      const SizedBox(width: 4),
+                      // Capsule 2: Content based on active tab
+                      OverlayCapsule(
+                        padding: const EdgeInsets.all(4),
+                        child: Builder(
+                          builder: (btnCtx) {
+                            final activeTool = c.activeTool;
+                            final seg = c.selectedSegmentId != null
+                                ? c.figure.getSegment(c.selectedSegmentId!)
+                                : null;
+
+                            if (_sideTab == 0) {
+                              // ── Tab 0: Draw Tools (s=switch) Line, Circle, Image, None ──
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Tooltip(
+                                    message: 'Line Tool',
+                                    child: EditorIconButton(
+                                      icon: Icons.edit,
+                                      color: kToolColor,
+                                      active: activeTool == EditorTool.line,
+                                      onTap: () {
+                                        c.setTool(EditorTool.line);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Circle Tool',
+                                    child: EditorIconButton(
+                                      icon: Icons.panorama_fish_eye,
+                                      color: kToolColor,
+                                      active: activeTool == EditorTool.circle,
+                                      onTap: () {
+                                        c.setTool(EditorTool.circle);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Image Tool',
+                                    child: EditorIconButton(
+                                      icon: Icons.image,
+                                      color: kToolColor,
+                                      active: activeTool == EditorTool.image,
+                                      onTap: () {
+                                        c.setTool(EditorTool.image);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Text Tool',
+                                    child: EditorIconButton(
+                                      icon: Icons.text_fields,
+                                      color: kToolColor,
+                                      active: activeTool == EditorTool.text,
+                                      onTap: () {
+                                        c.setTool(EditorTool.text);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'None Tool',
+                                    child: EditorIconButton(
+                                      icon: Icons.visibility_off,
+                                      color: kToolColor,
+                                      active: activeTool == EditorTool.none,
+                                      onTap: () {
+                                        c.setTool(EditorTool.none);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 1,
+                                    width: 24,
+                                    color: Theme.of(context).appColors.border,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Tooltip(
+                                    message: 'Join Tool',
+                                    child: EditorIconButton(
+                                      icon: Icons.join_inner,
+                                      color: kToolColor,
+                                      active: activeTool == EditorTool.join,
+                                      onTap: () {
+                                        c.setTool(EditorTool.join);
+                                        setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            } else if (_sideTab == 1) {
+                              // ── Tab 1: Type Tools (s=switch) change selected segment type ──
+                              final segType = seg?.type ?? 'line';
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Tooltip(
+                                    message: 'Type: Line',
+                                    child: EditorIconButton(
+                                      icon: Icons.edit,
+                                      color: kToolColor,
+                                      active: segType == 'line',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() {
+                                          seg.type = 'line';
+                                          seg.filled = true;
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Type: Circle',
+                                    child: EditorIconButton(
+                                      icon: Icons.panorama_fish_eye,
+                                      color: kToolColor,
+                                      active: segType == 'circle',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() {
+                                          seg.type = 'circle';
+                                          seg.filled = false;
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Type: Image',
+                                    child: EditorIconButton(
+                                      icon: Icons.image,
+                                      color: kToolColor,
+                                      active: segType == 'image',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() {
+                                          seg.type = 'image';
+                                          seg.filled = true;
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Type: Text',
+                                    child: EditorIconButton(
+                                      icon: Icons.text_fields,
+                                      color: kToolColor,
+                                      active: segType == 'text',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() {
+                                          seg.type = 'text';
+                                          seg.filled = false;
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Type: None',
+                                    child: EditorIconButton(
+                                      icon: Icons.visibility_off,
+                                      color: kToolColor,
+                                      active: segType == 'none',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() {
+                                          seg.type = 'none';
+                                          seg.filled = false;
+                                        });
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            } else if (_sideTab == 2) {
+                              // ── Tab 2: Linejoin Tools (s=switch) Round, Miter, Bevel ──
+                              final cap = seg?.lineCap ?? 'round';
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Tooltip(
+                                    message: 'Round',
+                                    child: EditorIconButton(
+                                      icon: Icons.circle_outlined,
+                                      color: kToolColor,
+                                      active: cap == 'round',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() => seg.lineCap = 'round');
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Square',
+                                    child: EditorIconButton(
+                                      icon: Icons.square_outlined,
+                                      color: kToolColor,
+                                      active: cap == 'square',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() => seg.lineCap = 'square');
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Butt',
+                                    child: EditorIconButton(
+                                      icon: Icons.remove,
+                                      color: kToolColor,
+                                      active: cap == 'butt',
+                                      disabled: seg == null,
+                                      onTap: () {
+                                        if (seg == null) return;
+                                        setState(() => seg.lineCap = 'butt');
+                                        c.forceUpdate();
+                                        c.pushHistory();
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            } else if (_sideTab == 3) {
+                              // ── Tab 3: Appearance Tools ──
+                              // Collect cycle fills relevant to selected segment
+                              final List<MapEntry<String, CycleFill>>
+                              segCycles = [];
+                              if (seg != null) {
+                                c.figure.cycleFills.forEach((key, cf) {
+                                  final pts = key
+                                      .split(',')
+                                      .map((p) => int.tryParse(p) ?? -1)
+                                      .toList();
+                                  if (pts.contains(seg.point1Index) &&
+                                      pts.contains(seg.point2Index)) {
+                                    segCycles.add(MapEntry(key, cf));
+                                  }
+                                });
+                              }
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Image replace (if image type)
+                                  if (seg != null && seg.type == 'image') ...[
+                                    Tooltip(
+                                      message: 'Replace Image',
+                                      child: EditorIconButton(
+                                        icon: Icons.image_search,
+                                        color: kToolColor,
+                                        onTap: () async {
+                                          try {
+                                            final result =
+                                                await FilePicker.pickFiles(
+                                                  type: FileType.image,
+                                                  withData: true,
+                                                );
+                                            if (result != null &&
+                                                result.files.isNotEmpty) {
+                                              final bytes =
+                                                  result.files.first.bytes;
+                                              if (bytes != null) {
+                                                final ext =
+                                                    result
+                                                        .files
+                                                        .first
+                                                        .extension ??
+                                                    'png';
+                                                final b64 = base64Encode(bytes);
+                                                final dataUri =
+                                                    'data:image/$ext;base64,$b64';
+                                                setState(() {
+                                                  if (seg
+                                                      .imageDataList
+                                                      .isEmpty) {
+                                                    seg.imageDataList.add(
+                                                      dataUri,
+                                                    );
+                                                    seg.activeImageIndex = 0;
+                                                  } else {
+                                                    seg.imageDataList[seg
+                                                            .activeImageIndex] =
+                                                        dataUri;
+                                                  }
+                                                });
+                                                c.forceUpdate();
+                                                c.pushHistory();
+                                              }
+                                            }
+                                          } catch (err) {
+                                            debugPrint(
+                                              "Error replacing image: $err",
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                  ],
+                                  // Stroke Color
+                                  Tooltip(
+                                    message: 'Stroke Color',
+                                    child: ColorCircle(
+                                      color: seg != null
+                                          ? (parseHexColor(seg.color) ??
+                                                const Color(0xFF22C55E))
+                                          : const Color(0xFF22C55E),
+                                      disabled: seg == null,
+                                      onTap: () async {
+                                        if (seg == null) return;
+                                        final Color? picked =
+                                            await showColorPickerSheet(
+                                              btnCtx,
+                                              parseHexColor(seg.color) ??
+                                                  Colors.black,
+                                            );
+                                        if (picked != null) {
+                                          setState(() {
+                                            seg.color = colorToHex(picked);
+                                          });
+                                          c.forceUpdate();
+                                          c.pushHistory();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  // Fill Color (Circle Only)
+                                  if (seg != null && seg.type == 'circle') ...[
+                                    const SizedBox(height: 4),
+                                    Tooltip(
+                                      message: 'Fill Color',
+                                      child: ColorCircle(
+                                        color:
+                                            parseHexColor(seg.fillColor) ??
+                                            Colors.white,
+                                        onTap: () async {
+                                          final Color? picked =
+                                              await showColorPickerSheet(
+                                                btnCtx,
+                                                parseHexColor(seg.fillColor) ??
+                                                    Colors.white,
+                                              );
+                                          if (picked != null) {
+                                            setState(() {
+                                              seg.fillColor = colorToHex(
+                                                picked,
+                                              );
+                                              seg.filled = true;
+                                            });
+                                            c.forceUpdate();
+                                            c.pushHistory();
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                  // Cycle Fill Colors
+                                  for (final entry in segCycles) ...[
+                                    const SizedBox(height: 4),
+                                    Tooltip(
+                                      message: 'Cycle (${entry.key})',
+                                      child: ColorCircle(
+                                        color:
+                                            parseHexColor(
+                                              entry.value.fillColor,
+                                            ) ??
+                                            const Color(0xFF9CA3AF),
+                                        onTap: () async {
+                                          final Color? picked =
+                                              await showColorPickerSheet(
+                                                btnCtx,
+                                                parseHexColor(
+                                                      entry.value.fillColor,
+                                                    ) ??
+                                                    Colors.grey,
+                                              );
+                                          if (picked != null) {
+                                            setState(() {
+                                              entry.value.fillColor =
+                                                  colorToHex(picked);
+                                              entry.value.filled = true;
+                                            });
+                                            c.forceUpdate();
+                                            c.pushHistory();
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            } else {
+                              // ── Tab 4: Segment Tools ──
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Point lock mode
+                                  if (c.selectedPointIndex != null &&
+                                      c.selectedPointIndex! <
+                                          c.figure.points.length) ...[
+                                    EditorIconButton(
+                                      icon:
+                                          c.pointModes[c.selectedPointIndex] ==
+                                              'static'
+                                          ? Icons.lock
+                                          : Icons.lock_open,
+                                      color: kToolColor,
+                                      active:
+                                          c.pointModes[c.selectedPointIndex] ==
+                                          'static',
+                                      onTap: () => c.togglePointMode(
+                                        c.selectedPointIndex!,
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    const SizedBox(width: 32, height: 32),
+                                  ],
+                                  const SizedBox(height: 4),
+                                  Tooltip(
+                                    message: 'Flip',
+                                    child: EditorIconButton(
+                                      icon: Icons.swap_horiz,
+                                      disabled: !canFlip,
+                                      onTap: _handleFlip,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  EditorIconButton(
+                                    icon: Icons.keyboard_arrow_up,
+                                    disabled: !canFlip,
+                                    onTap: _layerUp,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  EditorIconButton(
+                                    icon: Icons.keyboard_arrow_down,
+                                    disabled: !canFlip,
+                                    onTap: _layerDown,
+                                  ),
+                                  if (seg != null && seg.type == 'text') ...[
+                                    const SizedBox(height: 4),
+                                    Tooltip(
+                                      message: 'Edit Text',
+                                      child: EditorIconButton(
+                                        icon: Icons.edit_note,
+                                        color: kToolColor,
+                                        onTap: () => _editTextSegment(c, seg),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            }
+                          },
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 4),
-                // Capsule 2: Content based on active tab
-                OverlayCapsule(
-                  padding: const EdgeInsets.all(4),
-                  child: Builder(
-                    builder: (btnCtx) {
-                      final activeTool = c.activeTool;
-                      final seg = c.selectedSegmentId != null
-                          ? c.figure.getSegment(c.selectedSegmentId!)
-                          : null;
-
-                      if (_sideTab == 0) {
-                        // ── Tab 0: Draw Tools (s=switch) Line, Circle, Image, None ──
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tooltip(
-                              message: 'Line Tool',
-                              child: EditorIconButton(
-                                icon: Icons.edit,
-                                color: kToolColor,
-                                active: activeTool == EditorTool.line,
-                                onTap: () { c.setTool(EditorTool.line); setState(() {}); },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Circle Tool',
-                              child: EditorIconButton(
-                                icon: Icons.panorama_fish_eye,
-                                color: kToolColor,
-                                active: activeTool == EditorTool.circle,
-                                onTap: () { c.setTool(EditorTool.circle); setState(() {}); },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Image Tool',
-                              child: EditorIconButton(
-                                icon: Icons.image,
-                                color: kToolColor,
-                                active: activeTool == EditorTool.image,
-                                onTap: () { c.setTool(EditorTool.image); setState(() {}); },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Text Tool',
-                              child: EditorIconButton(
-                                icon: Icons.text_fields,
-                                color: kToolColor,
-                                active: activeTool == EditorTool.text,
-                                onTap: () { c.setTool(EditorTool.text); setState(() {}); },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'None Tool',
-                              child: EditorIconButton(
-                                icon: Icons.visibility_off,
-                                color: kToolColor,
-                                active: activeTool == EditorTool.none,
-                                onTap: () { c.setTool(EditorTool.none); setState(() {}); },
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(height: 1, width: 24, color: Theme.of(context).appColors.border),
-                            const SizedBox(height: 8),
-                            Tooltip(
-                              message: 'Join Tool',
-                              child: EditorIconButton(
-                                icon: Icons.join_inner,
-                                color: kToolColor,
-                                active: activeTool == EditorTool.join,
-                                onTap: () { c.setTool(EditorTool.join); setState(() {}); },
-                              ),
-                            ),
-                          ],
-                        );
-                      } else if (_sideTab == 1) {
-                        // ── Tab 1: Type Tools (s=switch) change selected segment type ──
-                        final segType = seg?.type ?? 'line';
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tooltip(
-                              message: 'Type: Line',
-                              child: EditorIconButton(
-                                icon: Icons.edit,
-                                color: kToolColor,
-                                active: segType == 'line',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() { seg.type = 'line'; seg.filled = true; });
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Type: Circle',
-                              child: EditorIconButton(
-                                icon: Icons.panorama_fish_eye,
-                                color: kToolColor,
-                                active: segType == 'circle',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() { seg.type = 'circle'; seg.filled = false; });
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Type: Image',
-                              child: EditorIconButton(
-                                icon: Icons.image,
-                                color: kToolColor,
-                                active: segType == 'image',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() { seg.type = 'image'; seg.filled = true; });
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Type: Text',
-                              child: EditorIconButton(
-                                icon: Icons.text_fields,
-                                color: kToolColor,
-                                active: segType == 'text',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() { seg.type = 'text'; seg.filled = false; });
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Type: None',
-                              child: EditorIconButton(
-                                icon: Icons.visibility_off,
-                                color: kToolColor,
-                                active: segType == 'none',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() { seg.type = 'none'; seg.filled = false; });
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                          ],
-                        );
-                      } else if (_sideTab == 2) {
-                        // ── Tab 2: Linejoin Tools (s=switch) Round, Miter, Bevel ──
-                        final cap = seg?.lineCap ?? 'round';
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tooltip(
-                              message: 'Round',
-                              child: EditorIconButton(
-                                icon: Icons.circle_outlined,
-                                color: kToolColor,
-                                active: cap == 'round',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() => seg.lineCap = 'round');
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Square',
-                              child: EditorIconButton(
-                                icon: Icons.square_outlined,
-                                color: kToolColor,
-                                active: cap == 'square',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() => seg.lineCap = 'square');
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Butt',
-                              child: EditorIconButton(
-                                icon: Icons.remove,
-                                color: kToolColor,
-                                active: cap == 'butt',
-                                disabled: seg == null,
-                                onTap: () {
-                                  if (seg == null) return;
-                                  setState(() => seg.lineCap = 'butt');
-                                  c.forceUpdate(); c.pushHistory();
-                                },
-                              ),
-                            ),
-                          ],
-                        );
-                      } else if (_sideTab == 3) {
-                        // ── Tab 3: Appearance Tools ──
-                        // Collect cycle fills relevant to selected segment
-                        final List<MapEntry<String, CycleFill>> segCycles = [];
-                        if (seg != null) {
-                          c.figure.cycleFills.forEach((key, cf) {
-                            final pts = key.split(',').map((p) => int.tryParse(p) ?? -1).toList();
-                            if (pts.contains(seg.point1Index) && pts.contains(seg.point2Index)) {
-                              segCycles.add(MapEntry(key, cf));
-                            }
-                          });
-                        }
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Image replace (if image type)
-                            if (seg != null && seg.type == 'image') ...[
-                              Tooltip(
-                                message: 'Replace Image',
-                                child: EditorIconButton(
-                                  icon: Icons.image_search,
-                                  color: kToolColor,
-                                  onTap: () async {
-                                    try {
-                                      final result = await FilePicker.pickFiles(
-                                        type: FileType.image,
-                                        withData: true,
-                                      );
-                                      if (result != null && result.files.isNotEmpty) {
-                                        final bytes = result.files.first.bytes;
-                                        if (bytes != null) {
-                                          final ext = result.files.first.extension ?? 'png';
-                                          final b64 = base64Encode(bytes);
-                                          final dataUri = 'data:image/$ext;base64,$b64';
-                                          setState(() {
-                                            if (seg.imageDataList.isEmpty) {
-                                              seg.imageDataList.add(dataUri);
-                                              seg.activeImageIndex = 0;
-                                            } else {
-                                              seg.imageDataList[seg.activeImageIndex] = dataUri;
-                                            }
-                                          });
-                                          c.forceUpdate(); c.pushHistory();
-                                        }
-                                      }
-                                    } catch (err) {
-                                      debugPrint("Error replacing image: $err");
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                            ],
-                            // Stroke Color
-                            Tooltip(
-                              message: 'Stroke Color',
-                              child: ColorCircle(
-                                color: seg != null
-                                    ? (parseHexColor(seg.color) ?? const Color(0xFF22C55E))
-                                    : const Color(0xFF22C55E),
-                                disabled: seg == null,
-                                onTap: () async {
-                                  if (seg == null) return;
-                                  final Color? picked = await showColorPickerSheet(
-                                    btnCtx,
-                                    parseHexColor(seg.color) ?? Colors.black,
-                                  );
-                                  if (picked != null) {
-                                    setState(() { seg.color = colorToHex(picked); });
-                                    c.forceUpdate(); c.pushHistory();
-                                  }
-                                },
-                              ),
-                            ),
-                            // Fill Color (Circle Only)
-                            if (seg != null && seg.type == 'circle') ...[
-                              const SizedBox(height: 4),
-                              Tooltip(
-                                message: 'Fill Color',
-                                child: ColorCircle(
-                                  color: parseHexColor(seg.fillColor) ?? Colors.white,
-                                  onTap: () async {
-                                    final Color? picked = await showColorPickerSheet(
-                                      btnCtx,
-                                      parseHexColor(seg.fillColor) ?? Colors.white,
-                                    );
-                                    if (picked != null) {
-                                      setState(() {
-                                        seg.fillColor = colorToHex(picked);
-                                        seg.filled = true;
-                                      });
-                                      c.forceUpdate(); c.pushHistory();
-                                    }
-                                  },
-                                ),
-                              ),
-                            ],
-                            // Cycle Fill Colors
-                            for (final entry in segCycles) ...[
-                              const SizedBox(height: 4),
-                              Tooltip(
-                                message: 'Cycle (${entry.key})',
-                                child: ColorCircle(
-                                  color: parseHexColor(entry.value.fillColor) ?? const Color(0xFF9CA3AF),
-                                  onTap: () async {
-                                    final Color? picked = await showColorPickerSheet(
-                                      btnCtx,
-                                      parseHexColor(entry.value.fillColor) ?? Colors.grey,
-                                    );
-                                    if (picked != null) {
-                                      setState(() {
-                                        entry.value.fillColor = colorToHex(picked);
-                                        entry.value.filled = true;
-                                      });
-                                      c.forceUpdate(); c.pushHistory();
-                                    }
-                                  },
-                                ),
-                              ),
-                            ],
-                          ],
-                        );
-                      } else {
-                        // ── Tab 4: Segment Tools ──
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Point lock mode
-                            if (c.selectedPointIndex != null &&
-                                c.selectedPointIndex! < c.figure.points.length) ...[
-                              EditorIconButton(
-                                icon: c.pointModes[c.selectedPointIndex] == 'static'
-                                    ? Icons.lock
-                                    : Icons.lock_open,
-                                color: kToolColor,
-                                active: c.pointModes[c.selectedPointIndex] == 'static',
-                                onTap: () => c.togglePointMode(c.selectedPointIndex!),
-                              ),
-                            ] else ...[
-                              const SizedBox(width: 32, height: 32),
-                            ],
-                            const SizedBox(height: 4),
-                            Tooltip(
-                              message: 'Flip',
-                              child: EditorIconButton(
-                                icon: Icons.swap_horiz,
-                                disabled: !canFlip,
-                                onTap: _handleFlip,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            EditorIconButton(
-                              icon: Icons.keyboard_arrow_up,
-                              disabled: !canFlip,
-                              onTap: _layerUp,
-                            ),
-                            const SizedBox(height: 4),
-                            EditorIconButton(
-                              icon: Icons.keyboard_arrow_down,
-                              disabled: !canFlip,
-                              onTap: _layerDown,
-                            ),
-                            if (seg != null && seg.type == 'text') ...[
-                              const SizedBox(height: 4),
-                              Tooltip(
-                                message: 'Edit Text',
-                                child: EditorIconButton(
-                                  icon: Icons.edit_note,
-                                  color: kToolColor,
-                                  onTap: () => _editTextSegment(c, seg),
-                                ),
-                              ),
-                            ],
-                          ],
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
           ),
 
           // Right sidebar.
@@ -1566,145 +1867,152 @@ class _EditorScreenState extends State<EditorScreen> {
             Positioned(
               top: 50 + pad.top,
               right: 4 + pad.right,
-              child: EditorPanel(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _MenuItem(
-                      icon: Icons.upload_file,
-                      label: 'Import SVG',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        widget.controller.importSvg().then((msg) {
-                          if (msg != null) _showSnack(msg);
-                        });
-                      },
+              child: ConstrainedBox(
+                // Cap the height so long menus scroll instead of overflowing
+                // the screen.
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height - pad.top - 50,
+                ),
+                child: EditorPanel(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _MenuItem(
+                          icon: Icons.upload_file,
+                          label: 'Import SVG',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            widget.controller.importSvg().then((msg) {
+                              if (msg != null) _showSnack(msg);
+                            });
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.image,
+                          label: 'Import SVG as Image',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            widget.controller.importSvgAsImage().then((msg) {
+                              if (msg != null) _showSnack(msg);
+                            });
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.face,
+                          label: 'Import Minecraft Skin',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            widget.controller.importMinecraftSkin(context).then(
+                              (msg) {
+                                if (msg != null) _showSnack(msg);
+                              },
+                            );
+                          },
+                        ),
+                        _MenuItem(
+                          icon: c.showConnectors ? Icons.link : Icons.link_off,
+                          label: c.showConnectors
+                              ? 'Hide Connectors'
+                              : 'Show Connectors',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            widget.controller.toggleConnectors();
+                          },
+                        ),
+                        _MenuItem(
+                          icon: c.showAxis ? Icons.grid_off : Icons.grid_on,
+                          label: c.showAxis
+                              ? 'Hide Grid Axis'
+                              : 'Show Grid Axis',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            widget.controller.toggleAxis();
+                          },
+                        ),
+                        _MenuItem(
+                          icon: c.snapEnabled ? Icons.grid_on : Icons.grid_off,
+                          label: c.snapEnabled ? 'Snap: On' : 'Snap: Off',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            widget.controller.toggleSnap();
+                            _showSnack(c.snapEnabled ? 'Snap on' : 'Snap off');
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.play_circle_outline,
+                          label: 'Preview',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            _openPreview();
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.gif_box_outlined,
+                          label: 'Export GIF',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            _exportGif();
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.burst_mode,
+                          label: 'Export PNG Frames',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            _exportPngZip();
+                          },
+                        ),
+                        // Animation projects are finished movies (GIF/PNG output);
+                        // Presets/Figures are reusable assets and keep Lottie.
+                        if (!c.isAnimationProject)
+                          _MenuItem(
+                            icon: Icons.animation,
+                            label: 'Export Lottie',
+                            onTap: () {
+                              setState(() => _showMenu = false);
+                              _exportLottie();
+                            },
+                          ),
+                        _MenuItem(
+                          icon: Icons.collections_bookmark,
+                          label: 'Poses',
+                          onTap: () {
+                            setState(() => _showMenu = false);
+                            _openPoseLibrary();
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.add,
+                          label: 'Zoom In',
+                          onTap: () {
+                            c.zoomIn();
+                            setState(() => _showMenu = false);
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.remove,
+                          label: 'Zoom Out',
+                          onTap: () {
+                            c.zoomOut();
+                            setState(() => _showMenu = false);
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.fullscreen,
+                          label: 'Reset Zoom',
+                          onTap: () {
+                            c.zoomReset();
+                            setState(() => _showMenu = false);
+                          },
+                        ),
+                      ],
                     ),
-                    _MenuItem(
-                      icon: Icons.image,
-                      label: 'Import SVG as Image',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        widget.controller.importSvgAsImage().then((msg) {
-                          if (msg != null) _showSnack(msg);
-                        });
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.face,
-                      label: 'Import Minecraft Skin',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        widget.controller
-                            .importMinecraftSkin(context)
-                            .then((msg) {
-                          if (msg != null) _showSnack(msg);
-                        });
-                      },
-                    ),
-                    _MenuItem(
-                      icon: c.showConnectors
-                          ? Icons.link
-                          : Icons.link_off,
-                      label: c.showConnectors
-                          ? 'Hide Connectors'
-                          : 'Show Connectors',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        widget.controller.toggleConnectors();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: c.showAxis
-                          ? Icons.grid_off
-                          : Icons.grid_on,
-                      label: c.showAxis
-                          ? 'Hide Grid Axis'
-                          : 'Show Grid Axis',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        widget.controller.toggleAxis();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: c.snapEnabled ? Icons.grid_on : Icons.grid_off,
-                      label: c.snapEnabled ? 'Snap: On' : 'Snap: Off',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        widget.controller.toggleSnap();
-                        _showSnack(c.snapEnabled ? 'Snap on' : 'Snap off');
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.play_circle_outline,
-                      label: 'Preview',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        _openPreview();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.gif_box_outlined,
-                      label: 'Export GIF',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        _exportGif();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.burst_mode,
-                      label: 'Export PNG Frames',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        _exportPngZip();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.animation,
-                      label: 'Export Lottie',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        _exportLottie();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.collections_bookmark,
-                      label: 'Poses',
-                      onTap: () {
-                        setState(() => _showMenu = false);
-                        _openPoseLibrary();
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.add,
-                      label: 'Zoom In',
-                      onTap: () {
-                        c.zoomIn();
-                        setState(() => _showMenu = false);
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.remove,
-                      label: 'Zoom Out',
-                      onTap: () {
-                        c.zoomOut();
-                        setState(() => _showMenu = false);
-                      },
-                    ),
-                    _MenuItem(
-                      icon: Icons.fullscreen,
-                      label: 'Reset Zoom',
-                      onTap: () {
-                        c.zoomReset();
-                        setState(() => _showMenu = false);
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-
         ],
       ),
     );
@@ -1712,8 +2020,9 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _editTextSegment(EditorController c, Segment seg) async {
     final textController = TextEditingController(text: seg.text ?? '');
-    final sizeController =
-        TextEditingController(text: seg.textSize.toStringAsFixed(0));
+    final sizeController = TextEditingController(
+      text: seg.textSize.toStringAsFixed(0),
+    );
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1809,12 +2118,10 @@ class _EditorScreenState extends State<EditorScreen> {
       if (opts == null) return;
       _runExport(
         label: 'Rendering GIF…',
-        job: () => FigureExport(c.figure, animation: c.currentAnimation)
-            .renderGif(
-          fps: opts.fps,
-          scale: opts.scale,
-          loop: opts.loop,
-        ),
+        job: () => FigureExport(
+          c.figure,
+          animation: c.currentAnimation,
+        ).renderGif(fps: opts.fps, scale: opts.scale, loop: opts.loop),
         fileName: 'animation.gif',
         extensions: const ['gif'],
       );
@@ -1830,8 +2137,10 @@ class _EditorScreenState extends State<EditorScreen> {
       if (opts == null) return;
       _runExport(
         label: 'Rendering PNG frames…',
-        job: () => FigureExport(c.figure, animation: c.currentAnimation)
-            .renderPngZip(scale: opts.scale),
+        job: () => FigureExport(
+          c.figure,
+          animation: c.currentAnimation,
+        ).renderPngZip(scale: opts.scale),
         fileName: 'frames.zip',
         extensions: const ['zip'],
       );
@@ -1841,21 +2150,22 @@ class _EditorScreenState extends State<EditorScreen> {
   void _exportLottie() {
     final c = widget.controller;
     _showSnack('Building Lottie…');
-    exportLottieJson(c.figure, c.currentAnimation).then((json) {
-      final bytes = utf8.encode(json);
-      FilePicker.saveFile(
-        bytes: bytes,
-        fileName: 'animation.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        dialogTitle: 'Export Lottie',
-      )
-          .then((path) {
-        if (path != null) _showSnack('Lottie saved');
-      });
-    }).catchError((_) {
-      if (mounted) _showSnack('Lottie export failed');
-    });
+    exportLottieJson(c.figure, c.currentAnimation)
+        .then((json) {
+          final bytes = utf8.encode(json);
+          FilePicker.saveFile(
+            bytes: bytes,
+            fileName: 'animation.json',
+            type: FileType.custom,
+            allowedExtensions: ['json'],
+            dialogTitle: 'Export Lottie',
+          ).then((path) {
+            if (path != null) _showSnack('Lottie saved');
+          });
+        })
+        .catchError((_) {
+          if (mounted) _showSnack('Lottie export failed');
+        });
   }
 
   Future<_ExportOptions?> _exportOptions({
@@ -1905,13 +2215,11 @@ class _EditorScreenState extends State<EditorScreen> {
                 StatefulBuilder(
                   builder: (ctx, setStateLocal) => Row(
                     children: [
-                      const Text('Loop',
-                          style: TextStyle(color: Colors.white)),
+                      const Text('Loop', style: TextStyle(color: Colors.white)),
                       const Spacer(),
                       Switch(
                         value: loopVal,
-                        onChanged: (v) =>
-                            setState(() => loopVal = v),
+                        onChanged: (v) => setState(() => loopVal = v),
                       ),
                     ],
                   ),
@@ -1956,25 +2264,26 @@ class _EditorScreenState extends State<EditorScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModal) {
-            job().then((bytes) {
-              if (ctx.mounted) Navigator.of(ctx).pop();
-              FilePicker.saveFile(
-                bytes: bytes,
-                fileName: fileName,
-                type: FileType.custom,
-                allowedExtensions: extensions,
-                dialogTitle: 'Export',
-              )
-                  .then((path) {
-                if (path != null) {
-                  // ignore: use_build_context_synchronously
-                  if (mounted) _showSnack('$fileName saved');
-                }
-              });
-            }).catchError((_) {
-              if (ctx.mounted) Navigator.of(ctx).pop();
-              if (mounted) _showSnack('Export failed');
-            });
+            job()
+                .then((bytes) {
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  FilePicker.saveFile(
+                    bytes: bytes,
+                    fileName: fileName,
+                    type: FileType.custom,
+                    allowedExtensions: extensions,
+                    dialogTitle: 'Export',
+                  ).then((path) {
+                    if (path != null) {
+                      // ignore: use_build_context_synchronously
+                      if (mounted) _showSnack('$fileName saved');
+                    }
+                  });
+                })
+                .catchError((_) {
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (mounted) _showSnack('Export failed');
+                });
             return AlertDialog(
               backgroundColor: const Color(0xFF17191E),
               content: Row(
@@ -2013,9 +2322,9 @@ class _EditorScreenState extends State<EditorScreen> {
       orElse: () => -1,
     );
     if (root == -1) return;
-    
+
     double currentVal = c.figure.getFigureOpacity(root, c.currentTime);
-    
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2023,7 +2332,6 @@ class _EditorScreenState extends State<EditorScreen> {
         builder: (ctx, setModalState) {
           final palette = Theme.of(context).appColors;
           return Container(
-            margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: palette.backgroundElement,
@@ -2033,8 +2341,14 @@ class _EditorScreenState extends State<EditorScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Opacity',
-                    style: TextStyle(color: palette.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(
+                  'Opacity',
+                  style: TextStyle(
+                    color: palette.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Slider(
                   value: currentVal,
@@ -2056,4 +2370,3 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 }
-

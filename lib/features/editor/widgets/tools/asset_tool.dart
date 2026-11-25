@@ -12,13 +12,22 @@ extension _AssetTool on _FigureCanvasState {
       final seg = fig.getSegment(widget.controller.assetSegmentId ?? '');
       if (seg != null && seg.isImage) {
         if (d.assetOp == 'move') {
-          seg.imageOffsetX = d.startOx + (w.dx - d.startX);
-          seg.imageOffsetY = d.startOy + (w.dy - d.startY);
+          final nx = d.startOx + (w.dx - d.startX);
+          final ny = d.startOy + (w.dy - d.startY);
+          widget.controller.recordSegmentValue(
+              seg, 'imageOffsetX', seg.imageOffsetX, nx);
+          widget.controller.recordSegmentValue(
+              seg, 'imageOffsetY', seg.imageOffsetY, ny);
+          seg.imageOffsetX = nx;
+          seg.imageOffsetY = ny;
           widget.controller.forceUpdate();
         } else if (d.assetOp == 'rotate') {
           final cur = math.atan2(w.dy - d.assetCenterY, w.dx - d.assetCenterX);
           var delta = cur - d.startAngle;
-          seg.imageRotate = d.startRot + delta * 180 / math.pi;
+          final nr = d.startRot + delta * 180 / math.pi;
+          widget.controller.recordSegmentValue(
+              seg, 'imageRotate', seg.imageRotate, nr);
+          seg.imageRotate = nr;
           widget.controller.forceUpdate();
         } else if (d.assetOp == 'resize') {
           _handleAssetResize(w, seg, d);
@@ -46,11 +55,13 @@ extension _AssetTool on _FigureCanvasState {
       final p1 = fig.points[seg.point1Index];
       final p2 = fig.points[seg.point2Index];
       final image = _imageFor(seg.imageData);
-      final size = _resolveImageSize(seg, image);
-      final mx = (p1.x + p2.x) / 2 + seg.imageOffsetX;
-      final my = (p1.y + p2.y) / 2 + seg.imageOffsetY;
+      final style = fig.styleFor(seg, widget.controller.currentTime,
+          enabled: widget.controller.isAnimateMode);
+      final size = _resolveStyleImageSize(style, image);
+      final mx = (p1.x + p2.x) / 2 + style.imageOffsetX;
+      final my = (p1.y + p2.y) / 2 + style.imageOffsetY;
       final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-      final rotate = segAngle + seg.imageRotate * math.pi / 180;
+      final rotate = segAngle + style.imageRotate * math.pi / 180;
       final handles = _assetHandles(size.width / 2, size.height / 2, rotate, mx, my);
 
       final z = widget.controller.camera.zoom;
@@ -67,9 +78,9 @@ extension _AssetTool on _FigureCanvasState {
             ..assetDrag = true
             ..assetOp = isRot ? 'rotate' : 'resize'
             ..assetHandle = i
-            ..startOx = seg.imageOffsetX
-            ..startOy = seg.imageOffsetY
-            ..startRot = seg.imageRotate
+            ..startOx = style.imageOffsetX
+            ..startOy = style.imageOffsetY
+            ..startRot = style.imageRotate
             ..startW = size.width
             ..startH = size.height
             ..assetCenterX = mx
@@ -96,8 +107,8 @@ extension _AssetTool on _FigureCanvasState {
           ..active = true
           ..assetDrag = true
           ..assetOp = 'move'
-          ..startOx = seg.imageOffsetX
-          ..startOy = seg.imageOffsetY
+          ..startOx = style.imageOffsetX
+          ..startOy = style.imageOffsetY
           ..startX = w.dx
           ..startY = w.dy;
         widget.controller.selectAssetSegment(seg.id);
@@ -140,11 +151,13 @@ extension _AssetTool on _FigureCanvasState {
       final p1 = fig.points[s.point1Index];
       final p2 = fig.points[s.point2Index];
       final image = _imageFor(s.imageData);
-      final size = _resolveImageSize(s, image);
-      final mx = (p1.x + p2.x) / 2 + s.imageOffsetX;
-      final my = (p1.y + p2.y) / 2 + s.imageOffsetY;
+      final style = fig.styleFor(s, widget.controller.currentTime,
+          enabled: widget.controller.isAnimateMode);
+      final size = _resolveStyleImageSize(style, image);
+      final mx = (p1.x + p2.x) / 2 + style.imageOffsetX;
+      final my = (p1.y + p2.y) / 2 + style.imageOffsetY;
       final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-      final rotate = segAngle + s.imageRotate * math.pi / 180;
+      final rotate = segAngle + style.imageRotate * math.pi / 180;
       final corners = _assetHandles(size.width / 2, size.height / 2, rotate, mx, my);
       if (_pointInRotatedRect(w, corners.take(8).toList(), mx, my, rotate)) {
         return s.id;
@@ -154,10 +167,13 @@ extension _AssetTool on _FigureCanvasState {
   }
 
   void _handleAssetResize(Offset w, Segment seg, _DragState d) {
-    final p1 = widget.controller.figure.points[seg.point1Index];
-    final p2 = widget.controller.figure.points[seg.point2Index];
+    final fig = widget.controller.figure;
+    final p1 = fig.points[seg.point1Index];
+    final p2 = fig.points[seg.point2Index];
+    final style = fig.styleFor(seg, widget.controller.currentTime,
+        enabled: widget.controller.isAnimateMode);
     final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-    final rotate = segAngle + seg.imageRotate * math.pi / 180;
+    final rotate = segAngle + style.imageRotate * math.pi / 180;
     final cosR = math.cos(-rotate), sinR = math.sin(-rotate);
     final dx = w.dx - d.assetCenterX, dy = w.dy - d.assetCenterY;
     final lx = dx * cosR - dy * sinR;
@@ -172,6 +188,10 @@ extension _AssetTool on _FigureCanvasState {
     if (h == 1 || h == 3 || h == 5 || h == 7) {
       newH = (ly.abs() * 2).clamp(10.0, double.infinity);
     }
+    widget.controller.recordSegmentValue(
+        seg, 'imageWidth', style.imageWidth, newW);
+    widget.controller.recordSegmentValue(
+        seg, 'imageHeight', style.imageHeight, newH);
     seg.imageWidth = newW;
     seg.imageHeight = newH;
   }

@@ -68,6 +68,7 @@ class _RootState extends State<Root> {
     final controller = await EditorController.load(
       mode: type == ProjectType.figure ? EditorMode.figure : EditorMode.animate,
       projectId: id,
+      projectType: type,
     );
     if (!mounted) return;
     setState(() {

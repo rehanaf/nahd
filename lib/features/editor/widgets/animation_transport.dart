@@ -24,16 +24,32 @@ class AnimationTransport extends StatelessWidget {
     }
 
     void goNext() {
+      final prevTime = controller.currentTime;
       final next = controller.currentFrame + 1;
-      var nt = next.toDouble();
+      final nt = next.toDouble();
+      var extended = false;
       if (nt + 0.001 >= controller.duration) {
         // Extend the timeline so the new frame actually exists.
         controller.setDuration(nt + 1);
         final anim = controller.ensureAnimation();
         if (nt + 1 > anim.duration) anim.duration = nt + 1;
         controller.forceUpdate();
+        extended = true;
       }
       controller.setCurrentTime(nt);
+      if (extended) {
+        // Seed the new frame with the current pose so the timeline
+        // continues from the previous frame.
+        controller.recordPointsAtCurrentFrame(
+          List<int>.generate(controller.figure.points.length, (i) => i),
+        );
+        // Also carry over segment sprite image indices from the previous frame.
+        final authored = controller.figure.authoredFrameTimes();
+        for (final seg in controller.figure.segments) {
+          final imgIdx = controller.figure.getSegmentImageIndex(seg.id, prevTime) ?? seg.activeImageIndex;
+          controller.figure.setSegmentImageIndex(seg.id, nt, imgIdx, authoredTimes: authored);
+        }
+      }
       controller.applyPose();
     }
 
@@ -42,10 +58,7 @@ class AnimationTransport extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          EditorIconButton(
-            icon: Icons.skip_previous,
-            onTap: goPrev,
-          ),
+          EditorIconButton(icon: Icons.skip_previous, onTap: goPrev),
           // Fixed-size slot: keeps the transport capsule from resizing when
           // the frame number gains/loses digits (e.g. 9/10 -> 10/100).
           SizedBox(
@@ -65,10 +78,7 @@ class AnimationTransport extends StatelessWidget {
               ),
             ),
           ),
-          EditorIconButton(
-            icon: Icons.skip_next,
-            onTap: goNext,
-          ),
+          EditorIconButton(icon: Icons.skip_next, onTap: goNext),
           Container(width: 1, height: 20, color: palette.border),
           const SizedBox(width: 2),
           Material(

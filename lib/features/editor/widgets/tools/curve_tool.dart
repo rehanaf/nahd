@@ -4,13 +4,17 @@ extension _CurveTool on _FigureCanvasState {
   void handleCurveStart(Offset w, EditorTool tool, Figure fig, CameraTransform cam) {
     if (tool == EditorTool.curve) {
       for (final s in fig.segments) {
-        if (!s.curved || s.controlDX == null) continue;
+        final style = fig.styleFor(s, widget.controller.currentTime,
+            enabled: widget.controller.isAnimateMode);
+        if (!style.curved || style.controlDX == null || style.controlDY == null) {
+          continue;
+        }
         final mx = (fig.points[s.point1Index].x + fig.points[s.point2Index].x) /
             2;
         final my = (fig.points[s.point1Index].y + fig.points[s.point2Index].y) /
             2;
-        final cx = mx + s.controlDX!;
-        final cy = my + s.controlDY!;
+        final cx = mx + style.controlDX!;
+        final cy = my + style.controlDY!;
         if (math.sqrt((w.dx - cx) * (w.dx - cx) + (w.dy - cy) * (w.dy - cy)) <
             12 / cam.zoom) {
           widget.controller.setSelectedSegment(s.id);
@@ -21,8 +25,8 @@ extension _CurveTool on _FigureCanvasState {
             ..curving = true
             ..startX = w.dx
             ..startY = w.dy
-            ..startPtX = s.controlDX!
-            ..startPtY = s.controlDY!;
+            ..startPtX = style.controlDX!
+            ..startPtY = style.controlDY!;
           return;
         }
       }
@@ -30,7 +34,15 @@ extension _CurveTool on _FigureCanvasState {
       if (segHit != null) {
         final seg = fig.getSegment(segHit);
         if (seg == null || seg.type != 'line') return;
-        if (seg.curved && seg.controlDX != null) {
+        final style = fig.styleFor(seg, widget.controller.currentTime,
+            enabled: widget.controller.isAnimateMode);
+        if (style.curved) {
+          widget.controller.recordSegmentValue(
+              seg, 'curved', style.curved, false);
+          widget.controller.recordSegmentValue(
+              seg, 'controlDX', style.controlDX, null);
+          widget.controller.recordSegmentValue(
+              seg, 'controlDY', style.controlDY, null);
           seg.curved = false;
           seg.controlDX = null;
           seg.controlDY = null;
@@ -40,6 +52,11 @@ extension _CurveTool on _FigureCanvasState {
           widget.controller.pushHistory();
           return;
         }
+        widget.controller.recordSegmentValue(seg, 'curved', style.curved, true);
+        widget.controller.recordSegmentValue(
+            seg, 'controlDX', style.controlDX, 0.0);
+        widget.controller.recordSegmentValue(
+            seg, 'controlDY', style.controlDY, 0.0);
         seg.curved = true;
         seg.controlDX = 0;
         seg.controlDY = 0;

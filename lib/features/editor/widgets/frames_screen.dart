@@ -25,6 +25,20 @@ class _FramesScreenState extends State<FramesScreen> {
   void initState() {
     super.initState();
     _selected = widget.controller.currentFrame;
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+    // Rebuild thumbnails so they reflect the current pose/overrides.
+    _cache.clear();
+    setState(() {});
   }
 
   EditorController get c => widget.controller;
@@ -56,18 +70,18 @@ class _FramesScreenState extends State<FramesScreen> {
     switch (action) {
       case 'copy':
         c.copyFrame(t);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Frame ${frame + 1} copied')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Frame ${frame + 1} copied')));
         break;
       case 'paste':
         if (!c.hasCopiedFrame) return;
         c.pasteFrame(t);
         _cache.clear();
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Pasted to frame ${frame + 1}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Pasted to frame ${frame + 1}')));
         break;
       case 'delete':
         c.deleteFrame(t);
@@ -86,7 +100,11 @@ class _FramesScreenState extends State<FramesScreen> {
       appBar: AppBar(
         title: Text(
           'Frames',
-          style: TextStyle(color: palette.text, fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: palette.text,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: palette.background,
         foregroundColor: palette.text,
@@ -135,7 +153,13 @@ class _FramesScreenState extends State<FramesScreen> {
         ),
         child: Column(
           children: [
-            Expanded(child: FigurePreview(figure: _thumbFor(frame))),
+            Expanded(
+              child: FigurePreview(
+                figure: _thumbFor(frame),
+                time: t,
+                enableFrameOverrides: true,
+              ),
+            ),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 3),
@@ -144,7 +168,9 @@ class _FramesScreenState extends State<FramesScreen> {
                 '${frame + 1}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFF60A5FA) : palette.textSecondary,
+                  color: isSelected
+                      ? const Color(0xFF60A5FA)
+                      : palette.textSecondary,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -169,7 +195,13 @@ class _FrameMenuSheet extends StatelessWidget {
     final items = [
       ('copy', Icons.copy_outlined, 'Copy Frame', palette.text, true),
       ('paste', Icons.content_paste, 'Paste Frame', palette.text, hasCopied),
-      ('delete', Icons.delete_outline, 'Delete Frame', const Color(0xFFF87171), true),
+      (
+        'delete',
+        Icons.delete_outline,
+        'Delete Frame',
+        const Color(0xFFF87171),
+        true,
+      ),
     ];
     return Material(
       color: palette.backgroundElement,
@@ -177,8 +209,10 @@ class _FrameMenuSheet extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -187,6 +221,7 @@ class _FrameMenuSheet extends StatelessWidget {
               final color = enabled ? item.$4 : palette.border;
               return ListTile(
                 enabled: enabled,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

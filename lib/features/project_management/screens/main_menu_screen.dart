@@ -8,6 +8,7 @@ import '../../../core/models/figure.dart';
 import '../controllers/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../editor/widgets/figure_preview.dart';
+import '../../update/update_dialog.dart';
 
 part 'main_menu_tiles.dart';
 part 'main_menu_sheets.dart';
@@ -76,6 +77,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     super.initState();
     _tab = widget.initialTab;
     _refresh();
+    showUpdateDialogIfAny(context);
   }
 
   Future<void> _refresh() async {
@@ -146,18 +148,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Future<void> _handleCreate(String name) async {
     final meta = await ProjectStorage.createProject(_tab, name, groupId: _newTargetGroup);
     if (mounted) widget.onOpenProject(meta.id, meta.type);
-  }
-
-  Future<void> _handleAnimationComingSoon(String _) async {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Animation Scene Editor — Coming Soon! 🎬',
-            style: TextStyle(color: Colors.white)),
-        backgroundColor: Color(0xFF7C3AED),
-        duration: Duration(seconds: 2),
-      ),
-    );
   }
 
   Future<void> _handleDelete(String id) async {
@@ -356,7 +346,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               : 'New Figure',
       placeholder: 'Project Name',
       buttonLabel: 'Create',
-      onSubmit: _tab == ProjectType.animation ? _handleAnimationComingSoon : _handleCreate,
+      onSubmit: _handleCreate,
     );
   }
 

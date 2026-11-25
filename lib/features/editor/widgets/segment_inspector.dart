@@ -191,12 +191,14 @@ class _SegmentInspectorState extends State<SegmentInspector> {
     final newY = p1.y + dy * k;
     final ox = newX - p2.x;
     final oy = newY - p2.y;
+    final children = figure.childPoints(seg.point2Index).toList();
     p2.x = newX;
     p2.y = newY;
-    for (final i in figure.childPoints(seg.point2Index)) {
+    for (final i in children) {
       figure.points[i].x += ox;
       figure.points[i].y += oy;
     }
+    widget.controller.recordPointsAtCurrentFrame([seg.point2Index, ...children]);
     setState(() {});
     widget.controller.forceUpdate();
     widget.controller.pushHistory();
@@ -219,27 +221,37 @@ class _SegmentInspectorState extends State<SegmentInspector> {
     final newY = p1.y + math.sin(rad) * cur;
     final ox = newX - p2.x;
     final oy = newY - p2.y;
+    final children = figure.childPoints(seg.point2Index).toList();
     p2.x = newX;
     p2.y = newY;
-    for (final i in figure.childPoints(seg.point2Index)) {
+    for (final i in children) {
       figure.points[i].x += ox;
       figure.points[i].y += oy;
     }
+    widget.controller.recordPointsAtCurrentFrame([seg.point2Index, ...children]);
     setState(() {});
     widget.controller.forceUpdate();
     widget.controller.pushHistory();
   }
 
   void _change(Segment seg, String field, Object? value) {
+    final c = widget.controller;
+    final style = c.figure.styleFor(seg, c.currentTime, enabled: c.isAnimateMode);
     switch (field) {
       case 'width':
-        seg.width = (value as num).toDouble();
+        final next = (value as num).toDouble();
+        c.recordSegmentValue(seg, field, style.width, next);
+        seg.width = next;
         break;
       case 'layer':
-        seg.layer = (value as num).toInt();
+        final next = (value as num).toInt();
+        c.recordSegmentValue(seg, field, style.layer, next);
+        seg.layer = next;
         break;
       case 'curvature':
-        seg.curvature = (value as num).toDouble();
+        final next = (value as num).toDouble();
+        c.recordSegmentValue(seg, field, style.curvature, next);
+        seg.curvature = next;
         break;
       default:
         _setField(seg, field, value);
@@ -251,44 +263,66 @@ class _SegmentInspectorState extends State<SegmentInspector> {
   }
 
   void _setField(Segment seg, String field, Object? value) {
+    final c = widget.controller;
+    final style = c.figure.styleFor(seg, c.currentTime, enabled: c.isAnimateMode);
     switch (field) {
       case 'type':
         seg.type = value as String;
         break;
       case 'color':
-        seg.color = value as String;
+        final next = value as String;
+        c.recordSegmentValue(seg, field, style.color, next);
+        seg.color = next;
         break;
       case 'fillColor':
-        seg.fillColor = value as String;
+        final next = value as String?;
+        c.recordSegmentValue(seg, field, style.fillColor, next);
+        seg.fillColor = next;
         break;
       case 'lineCap':
-        seg.lineCap = value as String;
+        final next = value as String;
+        c.recordSegmentValue(seg, field, style.lineCap, next);
+        seg.lineCap = next;
         break;
       case 'curved':
-        seg.curved = value as bool;
+        final next = value as bool;
+        c.recordSegmentValue(seg, field, style.curved, next);
+        seg.curved = next;
         break;
       case 'hidden':
-        seg.hidden = value as bool;
+        final next = value as bool;
+        c.recordSegmentValue(seg, field, style.hidden, next);
+        seg.hidden = next;
         break;
       case 'filled':
-        seg.filled = value as bool;
+        final next = value as bool;
+        c.recordSegmentValue(seg, field, style.filled, next);
+        seg.filled = next;
         break;
       case 'imageOffsetX':
-        seg.imageOffsetX = (value as num).toDouble();
+        final next = (value as num).toDouble();
+        c.recordSegmentValue(seg, field, style.imageOffsetX, next);
+        seg.imageOffsetX = next;
         break;
       case 'imageOffsetY':
-        seg.imageOffsetY = (value as num).toDouble();
+        final next = (value as num).toDouble();
+        c.recordSegmentValue(seg, field, style.imageOffsetY, next);
+        seg.imageOffsetY = next;
         break;
       case 'imageRotate':
-        seg.imageRotate = (value as num).toDouble();
+        final next = (value as num).toDouble();
+        c.recordSegmentValue(seg, field, style.imageRotate, next);
+        seg.imageRotate = next;
         break;
       case 'isCollision':
-        seg.isCollision = value as bool;
+        final next = value as bool;
+        c.recordSegmentValue(seg, field, style.isCollision, next);
+        seg.isCollision = next;
         break;
     }
     setState(() {});
-    widget.controller.forceUpdate();
-    widget.controller.pushHistory();
+    c.forceUpdate();
+    c.pushHistory();
   }
 
   Future<void> _pickImage(Segment seg) async {
@@ -349,6 +383,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
       return _empty('Segment tidak ditemukan');
     }
     final isAnimating = c.isAnimateMode;
+    final style = figure.styleFor(seg, c.currentTime, enabled: isAnimating);
 
     Widget label(String text) => Padding(
           padding: const EdgeInsets.only(bottom: 4),
@@ -422,24 +457,43 @@ class _SegmentInspectorState extends State<SegmentInspector> {
               ),
               IconButton(
                 icon: Icon(
-                  seg.hidden ? Icons.visibility_off : Icons.visibility,
+                  style.hidden ? Icons.visibility_off : Icons.visibility,
                   size: 16,
-                  color: seg.hidden ? const Color(0xFFFB923C) : palette.textSecondary,
+                  color: style.hidden ? const Color(0xFFFB923C) : palette.textSecondary,
                 ),
-                onPressed: () => _change(seg, 'hidden', !seg.hidden),
+                onPressed: () => _change(seg, 'hidden', !style.hidden),
                 visualDensity: VisualDensity.compact,
               ),
-              IconButton(
+              Tooltip(
+                message: 'Hapus',
+                child: IconButton(
                 icon: const Icon(Icons.delete, size: 16, color: Color(0xFFF87171)),
                 onPressed: () {
-                  figure.removeSegment(seg.id);
+                  if (c.isAnimationProject) {
+                    // Animation: a delete only hides the object from this
+                    // frame onward. Earlier frames keep it, exactly like the
+                    // visibility tool, and the object can be re-created later.
+                    final root = _rootOfSegment(figure, seg);
+                    if (root >= 0) c.hideFigureAtCurrentFrame(root);
+                  } else if (isAnimating) {
+                    // Preset: keep its own per-frame hide path.
+                    final root = _rootOfSegment(figure, seg);
+                    if (root >= 0) {
+                      figure.setFigureVisibility(root, c.currentTime, false,
+                          authoredTimes: c.authoredFrameTimes());
+                    }
+                    c.forceUpdate();
+                    c.pushHistory();
+                  } else {
+                    figure.removeSegment(seg.id);
+                    c.forceUpdate();
+                    c.pushHistory();
+                  }
                   c.setSelectedSegment(null);
                   c.setSelectedPoint(null);
-                  c.forceUpdate();
-                  c.pushHistory();
                 },
                 visualDensity: VisualDensity.compact,
-              ),
+              )),
             ],
           ),
           const SizedBox(height: 4),
@@ -455,7 +509,8 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         child: InkWell(
                           onTap: () {
                             figure.setFigureVisibility(
-                                figRoot, c.currentTime, !figVisibleNow);
+                                figRoot, c.currentTime, !figVisibleNow,
+                                authoredTimes: c.authoredFrameTimes());
                             c.forceUpdate();
                             c.pushHistory();
                           },
@@ -503,7 +558,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         children: [
                           const Icon(Icons.delete, size: 14, color: Color(0xFFF87171)),
                           const SizedBox(width: 8),
-                          Text('Hapus Figure dari Scene',
+                          Text('Hapus Permanen dari Scene',
                               style: TextStyle(
                                   color: Color(0xFFF87171),
                                   fontSize: 13,
@@ -532,7 +587,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                           color: palette.textSecondary, fontSize: 13)),
                 ),
                 Switch(
-                  value: seg.isCollision,
+                  value: style.isCollision,
                   onChanged: (v) => _change(seg, 'isCollision', v),
                   activeTrackColor: const Color(0xFF22C55E),
                 ),
@@ -554,7 +609,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         focusNode: _lengthFocus,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true, signed: true),
-                        enabled: !isAnimating,
                         style: TextStyle(color: palette.text, fontSize: 14),
                         decoration: InputDecoration(
                           isDense: true,
@@ -577,9 +631,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                     ),
                     const SizedBox(width: 6),
                     InkWell(
-                      onTap: isAnimating
-                          ? null
-                          : () {
+                      onTap: () {
                               final n = double.tryParse(
                                   _lengthController.text);
                               if (n != null) _setSegmentLength(seg, n);
@@ -608,7 +660,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         focusNode: _angleFocus,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true, signed: true),
-                        enabled: !isAnimating,
                         style: TextStyle(color: palette.text, fontSize: 14),
                         decoration: InputDecoration(
                           isDense: true,
@@ -631,9 +682,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                     ),
                     const SizedBox(width: 6),
                     InkWell(
-                      onTap: isAnimating
-                          ? null
-                          : () {
+                      onTap: () {
                               final n =
                                   double.tryParse(_angleController.text);
                               if (n != null) _setSegmentAngle(seg, n);
@@ -703,7 +752,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                 label('Color'),
                 ColorField(
                   palette: palette,
-                  selected: parseHexColor(seg.color),
+                  selected: parseHexColor(style.color),
                   onChanged: (c2) => _change(seg, 'color', colorToHex(c2)),
                 ),
                 const SizedBox(height: 12),
@@ -715,21 +764,20 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                               color: palette.textSecondary, fontSize: 13)),
                     ),
                     Switch(
-                      value: seg.curved,
-                      onChanged: isAnimating ? null : (v) => _change(seg, 'curved', v),
+                      value: style.curved,
+                      onChanged: (v) => _change(seg, 'curved', v),
                       activeTrackColor: const Color(0xFF3B82F6),
                     ),
                   ],
                 ),
-                if (seg.curved) ...[
+                if (style.curved) ...[
                   const SizedBox(height: 8),
                   label('Curvature'),
                   TextField(
                     controller: TextEditingController(
-                      text: seg.curvature.toStringAsFixed(2),
+                      text: style.curvature.toStringAsFixed(2),
                     ),
                     keyboardType: TextInputType.number,
-                    enabled: !isAnimating,
                     style: TextStyle(color: palette.text, fontSize: 14),
                     decoration: InputDecoration(
                       isDense: true,
@@ -752,7 +800,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   TextField(
                     controller: _widthController,
                     keyboardType: TextInputType.number,
-                    enabled: !isAnimating,
                     style: TextStyle(color: palette.text, fontSize: 14),
                     decoration: InputDecoration(
                       isDense: true,
@@ -782,10 +829,8 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                                 color: palette.textSecondary, fontSize: 13)),
                       ),
                       Switch(
-                        value: seg.filled != false,
-                        onChanged: isAnimating
-                            ? null
-                            : (v) => _change(seg, 'filled', v),
+                        value: style.filled,
+                        onChanged: (v) => _change(seg, 'filled', v),
                         activeTrackColor: const Color(0xFF3B82F6),
                       ),
                     ],
@@ -795,7 +840,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                     label('Fill Color'),
                     ColorField(
                       palette: palette,
-                      selected: parseHexColor(seg.fillColor),
+                      selected: parseHexColor(style.fillColor),
                       onChanged: (c2) =>
                           _change(seg, 'fillColor', colorToHex(c2)),
                     ),
@@ -805,7 +850,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   TextField(
                     controller: _widthController,
                     keyboardType: TextInputType.number,
-                    enabled: !isAnimating,
                     style: TextStyle(color: palette.text, fontSize: 14),
                     decoration: InputDecoration(
                       isDense: true,
@@ -868,7 +912,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                 TextField(
                   controller: _layerController,
                   keyboardType: TextInputType.number,
-                  enabled: !isAnimating,
                   style: TextStyle(color: palette.text, fontSize: 14),
                   decoration: InputDecoration(
                     isDense: true,
@@ -901,7 +944,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         key: const ValueKey('scale-all-field'),
                         controller: _scaleAllController,
                         keyboardType: TextInputType.number,
-                        enabled: !isAnimating,
                         style: TextStyle(color: palette.text, fontSize: 14),
                         decoration: InputDecoration(
                           isDense: true,
@@ -920,7 +962,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                     ),
                     const SizedBox(width: 6),
                     InkWell(
-                      onTap: isAnimating ? null : _applyScaleAll,
+                      onTap: _applyScaleAll,
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.all(10),
@@ -975,7 +1017,13 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                                 for (final ss in figure.segments) {
                                   if (pts.contains(ss.point1Index) &&
                                       pts.contains(ss.point2Index)) {
-                                    ss.layer++;
+                                    final old = c.figure.frameInt(
+                                        'seg:${ss.id}:layer',
+                                        c.currentTime,
+                                        ss.layer);
+                                    c.recordSegmentValue(
+                                        ss, 'layer', old, old + 1);
+                                    ss.layer = old + 1;
                                   }
                                 }
                                 setState(() {});
@@ -991,8 +1039,13 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                                 for (final ss in figure.segments) {
                                   if (pts.contains(ss.point1Index) &&
                                       pts.contains(ss.point2Index)) {
-                                    ss.layer =
-                                        ss.layer > 0 ? ss.layer - 1 : 0;
+                                    final old = c.figure.frameInt(
+                                        'seg:${ss.id}:layer',
+                                        c.currentTime,
+                                        ss.layer);
+                                    final next = old > 0 ? old - 1 : 0;
+                                    c.recordSegmentValue(ss, 'layer', old, next);
+                                    ss.layer = next;
                                   }
                                 }
                                 setState(() {});
@@ -1005,14 +1058,24 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(entry.filled ? 'Filled' : 'Empty',
+                              child: Text(
+                                  c.figure.frameBool('cycle:$key:filled',
+                                          c.currentTime, entry.filled)
+                                      ? 'Filled'
+                                      : 'Empty',
                                   style: TextStyle(
                                       color: palette.textSecondary,
                                       fontSize: 13)),
                             ),
                             Switch(
-                              value: entry.filled != false,
+                              value: c.figure.frameBool('cycle:$key:filled',
+                                  c.currentTime, entry.filled),
                               onChanged: (v) {
+                                final old = c.figure.frameBool(
+                                    'cycle:$key:filled',
+                                    c.currentTime,
+                                    entry.filled);
+                                c.recordCycleValue(key, 'filled', old, v);
                                 entry.filled = v;
                                 setState(() {});
                                 c.forceUpdate();
@@ -1022,13 +1085,23 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                             ),
                           ],
                         ),
-                        if (entry.filled != false) ...[
+                        if (c.figure.frameBool('cycle:$key:filled',
+                            c.currentTime, entry.filled)) ...[
                           const SizedBox(height: 8),
                           ColorField(
                             palette: palette,
-                            selected: parseHexColor(entry.fillColor),
+                            selected: parseHexColor(c.figure.frameNullableString(
+                                'cycle:$key:fillColor',
+                                c.currentTime,
+                                entry.fillColor)),
                             onChanged: (c2) {
-                              entry.fillColor = colorToHex(c2);
+                              final next = colorToHex(c2);
+                              final old = c.figure.frameNullableString(
+                                  'cycle:$key:fillColor',
+                                  c.currentTime,
+                                  entry.fillColor);
+                              c.recordCycleValue(key, 'fillColor', old, next);
+                              entry.fillColor = next;
                               setState(() {});
                               c.forceUpdate();
                               c.pushHistory();
@@ -1059,6 +1132,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
 
   Widget _imageSection(Segment seg, AppPalette palette, bool isAnimating) {
     final c = widget.controller;
+    final style = c.figure.styleFor(seg, c.currentTime, enabled: c.isAnimateMode);
     Widget autoDimField(
       String axis,
       dynamic value,
@@ -1071,7 +1145,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
             child: TextField(
               controller: TextEditingController(
                   text: isAuto ? '' : value.toString()),
-              enabled: !isAnimating && !isAuto,
+              enabled: !isAuto,
               keyboardType: TextInputType.number,
               style: TextStyle(color: palette.text, fontSize: 14),
               decoration: InputDecoration(
@@ -1093,9 +1167,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: isAnimating
-                ? null
-                : () => onChange(isAuto ? 100 : 'auto'),
+            onTap: () => onChange(isAuto ? 100 : 'auto'),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
@@ -1140,7 +1212,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
               Expanded(
                 child: TextField(
                   controller: TextEditingController(text: value.toString()),
-                  enabled: !isAnimating,
                   keyboardType: TextInputType.number,
                   style: TextStyle(color: palette.text, fontSize: 14),
                   decoration: InputDecoration(
@@ -1168,15 +1239,20 @@ class _SegmentInspectorState extends State<SegmentInspector> {
     }
 
     void setImageDim(String axis, dynamic v) {
+      final oldW = style.imageWidth;
+      final oldH = style.imageHeight;
+      var newW = oldW;
+      var newH = oldH;
       if (axis == 'imageWidth') {
-        seg.imageWidth = v;
+        newW = v;
       } else {
-        seg.imageHeight = v;
+        newH = v;
       }
-      if (seg.imageWidth == 'auto' && seg.imageHeight == 'auto') {
-        seg.imageWidth = 100;
-        seg.imageHeight = 'auto';
-      }
+      if (newW == 'auto' && newH == 'auto') newW = 100;
+      widget.controller.recordSegmentValue(seg, 'imageWidth', oldW, newW);
+      widget.controller.recordSegmentValue(seg, 'imageHeight', oldH, newH);
+      seg.imageWidth = newW;
+      seg.imageHeight = newH;
       setState(() {});
       c.forceUpdate();
       c.pushHistory();
@@ -1274,7 +1350,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1)),
           const SizedBox(height: 4),
-          autoDimField('imageWidth', seg.imageWidth, (v) => setImageDim('imageWidth', v)),
+          autoDimField('imageWidth', style.imageWidth, (v) => setImageDim('imageWidth', v)),
           const SizedBox(height: 12),
           Text('Height',
               style: TextStyle(
@@ -1283,23 +1359,26 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1)),
           const SizedBox(height: 4),
-          autoDimField('imageHeight', seg.imageHeight, (v) => setImageDim('imageHeight', v)),
+          autoDimField('imageHeight', style.imageHeight, (v) => setImageDim('imageHeight', v)),
           const SizedBox(height: 12),
-          numericField('Offset X', seg.imageOffsetX, (v) {
+          numericField('Offset X', style.imageOffsetX, (v) {
+            c.recordSegmentValue(seg, 'imageOffsetX', style.imageOffsetX, v);
             seg.imageOffsetX = v;
             setState(() {});
             c.forceUpdate();
             c.pushHistory();
           }, 'X'),
           const SizedBox(height: 8),
-          numericField('Offset Y', seg.imageOffsetY, (v) {
+          numericField('Offset Y', style.imageOffsetY, (v) {
+            c.recordSegmentValue(seg, 'imageOffsetY', style.imageOffsetY, v);
             seg.imageOffsetY = v;
             setState(() {});
             c.forceUpdate();
             c.pushHistory();
           }, 'Y'),
           const SizedBox(height: 8),
-          numericField('Rotate', seg.imageRotate, (v) {
+          numericField('Rotate', style.imageRotate, (v) {
+            c.recordSegmentValue(seg, 'imageRotate', style.imageRotate, v);
             seg.imageRotate = v;
             setState(() {});
             c.forceUpdate();

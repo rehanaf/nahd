@@ -14,6 +14,8 @@ extension _DrawTool on _FigureCanvasState {
         final seg = fig.createSegment('text', p1, p2);
         _lastPt = p2;
         seg.text = 'Text';
+        widget.controller.markSegmentBornAtCurrentFrame(seg);
+        widget.controller.recordPointsAtCurrentFrame([p1, p2]);
         widget.controller.setSelectedSegment(seg.id);
         widget.controller.setSelectedPoint(p1);
         widget.controller.forceUpdate();
@@ -36,6 +38,8 @@ extension _DrawTool on _FigureCanvasState {
               (s.point1Index == ptHit && s.point2Index == last));
       if (last != null && last != ptHit && !alreadyConnected) {
         final seg = fig.createSegment(tool.name, last, ptHit);
+        widget.controller.markSegmentBornAtCurrentFrame(seg);
+        widget.controller.recordPointsAtCurrentFrame([last, ptHit]);
         widget.controller.setSelectedSegment(seg.id);
         widget.controller.setSelectedPoint(ptHit);
         _lastPt = ptHit;
@@ -45,6 +49,8 @@ extension _DrawTool on _FigureCanvasState {
       }
       final p2 = fig.addPoint(w.dx, w.dy);
       final seg = fig.createSegment(tool.name, ptHit, p2);
+      widget.controller.markSegmentBornAtCurrentFrame(seg);
+      widget.controller.recordPointsAtCurrentFrame([ptHit, p2]);
       _lastPt = p2;
       widget.controller.setSelectedSegment(seg.id);
       widget.controller.setSelectedPoint(p2);
@@ -128,9 +134,14 @@ extension _DrawTool on _FigureCanvasState {
     );
     if (result == 'ok') {
       final text = controller.text.trim();
-      seg.text = text.isEmpty ? 'Text' : text;
+      final newText = text.isEmpty ? 'Text' : text;
       final size = double.tryParse(sizeController.text);
-      seg.textSize = (size == null || size <= 0) ? 32 : size;
+      final newSize = (size == null || size <= 0) ? 32.0 : size;
+      widget.controller.recordSegmentValue(seg, 'text', seg.text, newText);
+      widget.controller.recordSegmentValue(
+          seg, 'textSize', seg.textSize, newSize);
+      seg.text = newText;
+      seg.textSize = newSize;
 
       // Keep the two text points so the label renders even before the next
       // layout, and push a single undoable change.

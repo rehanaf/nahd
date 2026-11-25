@@ -26,17 +26,25 @@ extension _TransformTools on _FigureCanvasState {
         final origCtrl = <String, _Ctrl>{};
         final origSegs = <String, _SegInitial>{};
         for (final s in fig.segments) {
-          if (s.curved && s.controlDX != null && s.controlDY != null) {
-            origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+          final style = fig.styleFor(s, widget.controller.currentTime,
+              enabled: widget.controller.isAnimateMode);
+          if (style.curved &&
+              style.controlDX != null &&
+              style.controlDY != null) {
+            origCtrl[s.id] = _Ctrl(style.controlDX!, style.controlDY!);
           }
           if (multiSel.contains(s.point1Index) &&
               multiSel.contains(s.point2Index)) {
             double iw = 100.0;
-            if (s.imageWidth is num) iw = (s.imageWidth as num).toDouble();
+            if (style.imageWidth is num) {
+              iw = (style.imageWidth as num).toDouble();
+            }
             double ih = 100.0;
-            if (s.imageHeight is num) ih = (s.imageHeight as num).toDouble();
-            origSegs[s.id] =
-                _SegInitial(width: s.width, imageWidth: iw, imageHeight: ih);
+            if (style.imageHeight is num) {
+              ih = (style.imageHeight as num).toDouble();
+            }
+            origSegs[s.id] = _SegInitial(
+                width: style.width, imageWidth: iw, imageHeight: ih);
           }
         }
         final startDist =
@@ -94,20 +102,22 @@ extension _TransformTools on _FigureCanvasState {
       final origCtrl = <String, _Ctrl>{};
       final origSegs = <String, _SegInitial>{};
       for (final s in fig.segments) {
-        if (s.curved && s.controlDX != null && s.controlDY != null) {
-          origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+        final style = fig.styleFor(s, widget.controller.currentTime,
+            enabled: widget.controller.isAnimateMode);
+        if (style.curved && style.controlDX != null && style.controlDY != null) {
+          origCtrl[s.id] = _Ctrl(style.controlDX!, style.controlDY!);
         }
         if (comp.contains(s.point1Index) && comp.contains(s.point2Index)) {
           double iw = 100.0;
-          if (s.imageWidth is num) {
-            iw = (s.imageWidth as num).toDouble();
+          if (style.imageWidth is num) {
+            iw = (style.imageWidth as num).toDouble();
           }
           double ih = 100.0;
-          if (s.imageHeight is num) {
-            ih = (s.imageHeight as num).toDouble();
+          if (style.imageHeight is num) {
+            ih = (style.imageHeight as num).toDouble();
           }
           origSegs[s.id] = _SegInitial(
-            width: s.width,
+            width: style.width,
             imageWidth: iw,
             imageHeight: ih,
           );
@@ -160,8 +170,10 @@ extension _TransformTools on _FigureCanvasState {
           .toList();
       final origCtrl = <String, _Ctrl>{};
       for (final s in fig.segments) {
-        if (s.curved && s.controlDX != null && s.controlDY != null) {
-          origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+        final style = fig.styleFor(s, widget.controller.currentTime,
+            enabled: widget.controller.isAnimateMode);
+        if (style.curved && style.controlDX != null && style.controlDY != null) {
+          origCtrl[s.id] = _Ctrl(style.controlDX!, style.controlDY!);
         }
       }
       _captureAnchorForPoint(fig, root, all: true);
@@ -204,10 +216,14 @@ extension _TransformTools on _FigureCanvasState {
       final my = fig.points[ptHit].y;
       final origCtrl = <String, _Ctrl>{};
       for (final s in fig.segments) {
-        if (!s.curved || s.controlDX == null || s.controlDY == null) continue;
+        final style = fig.styleFor(s, widget.controller.currentTime,
+            enabled: widget.controller.isAnimateMode);
+        if (!style.curved || style.controlDX == null || style.controlDY == null) {
+          continue;
+        }
         if (multiSel.contains(s.point1Index) ||
             multiSel.contains(s.point2Index)) {
-          origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+          origCtrl[s.id] = _Ctrl(style.controlDX!, style.controlDY!);
         }
       }
       _captureAnchorForPoint(fig, ptHit, all: true);
@@ -398,8 +414,10 @@ extension _TransformTools on _FigureCanvasState {
         .toList();
     final origCtrl = <String, _Ctrl>{};
     for (final s in fig.segments) {
-      if (s.curved && s.controlDX != null && s.controlDY != null) {
-        origCtrl[s.id] = _Ctrl(s.controlDX!, s.controlDY!);
+      final style = fig.styleFor(s, widget.controller.currentTime,
+          enabled: widget.controller.isAnimateMode);
+      if (style.curved && style.controlDX != null && style.controlDY != null) {
+        origCtrl[s.id] = _Ctrl(style.controlDX!, style.controlDY!);
       }
     }
     _captureAnchorForPoint(fig, ptHit, all: true);

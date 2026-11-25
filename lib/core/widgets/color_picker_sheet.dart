@@ -155,6 +155,8 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Column(

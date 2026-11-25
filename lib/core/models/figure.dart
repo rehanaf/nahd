@@ -22,6 +22,76 @@ class CycleFill {
   CycleFill clone() => CycleFill(filled: filled, fillColor: fillColor);
 }
 
+/// Resolves a segment's visual properties at one frame.
+///
+/// The base [Segment] always stores the newest value; a [Figure] may also
+/// carry per-frame overrides written by the tools. This wrapper lets both the
+/// editor painter and the exporters read exactly the same value for a frame.
+class SegmentFrameStyle {
+  final Figure figure;
+  final Segment segment;
+  final double time;
+  final bool enabled;
+
+  const SegmentFrameStyle(this.figure, this.segment, this.time,
+      {this.enabled = true});
+
+  String _key(String prop) => 'seg:${segment.id}:$prop';
+
+  bool get hidden =>
+      enabled ? figure.frameBool(_key('hidden'), time, segment.hidden) : segment.hidden;
+  double get width =>
+      enabled ? figure.frameDouble(_key('width'), time, segment.width) : segment.width;
+  String get color =>
+      enabled ? figure.frameString(_key('color'), time, segment.color) : segment.color;
+  String? get fillColor => enabled
+      ? figure.frameNullableString(_key('fillColor'), time, segment.fillColor)
+      : segment.fillColor;
+  String get lineCap => enabled
+      ? figure.frameString(_key('lineCap'), time, segment.lineCap)
+      : segment.lineCap;
+  int get layer =>
+      enabled ? figure.frameInt(_key('layer'), time, segment.layer) : segment.layer;
+  bool get curved =>
+      enabled ? figure.frameBool(_key('curved'), time, segment.curved) : segment.curved;
+  double get curvature => enabled
+      ? figure.frameDouble(_key('curvature'), time, segment.curvature)
+      : segment.curvature;
+  double? get controlDX => enabled
+      ? figure.frameNullableDouble(_key('controlDX'), time, segment.controlDX)
+      : segment.controlDX;
+  double? get controlDY => enabled
+      ? figure.frameNullableDouble(_key('controlDY'), time, segment.controlDY)
+      : segment.controlDY;
+  dynamic get imageWidth => enabled
+      ? figure.frameObject(_key('imageWidth'), time, segment.imageWidth)
+      : segment.imageWidth;
+  dynamic get imageHeight => enabled
+      ? figure.frameObject(_key('imageHeight'), time, segment.imageHeight)
+      : segment.imageHeight;
+  double get imageOffsetX => enabled
+      ? figure.frameDouble(_key('imageOffsetX'), time, segment.imageOffsetX)
+      : segment.imageOffsetX;
+  double get imageOffsetY => enabled
+      ? figure.frameDouble(_key('imageOffsetY'), time, segment.imageOffsetY)
+      : segment.imageOffsetY;
+  double get imageRotate => enabled
+      ? figure.frameDouble(_key('imageRotate'), time, segment.imageRotate)
+      : segment.imageRotate;
+  bool get filled => enabled
+      ? figure.frameBool(_key('filled'), time, segment.filled)
+      : segment.filled;
+  bool get isCollision => enabled
+      ? figure.frameBool(_key('isCollision'), time, segment.isCollision)
+      : segment.isCollision;
+  String? get text => enabled
+      ? figure.frameNullableString(_key('text'), time, segment.text)
+      : segment.text;
+  double get textSize => enabled
+      ? figure.frameDouble(_key('textSize'), time, segment.textSize)
+      : segment.textSize;
+}
+
 class VisibilityKeyframe {
   double time;
   bool visible;
@@ -161,6 +231,21 @@ class Figure {
   Map<String, List<OpacityKeyframe>> opacity;
   Map<String, List<FigureColorKeyframe>> colors;
   Map<String, List<SegmentImageKeyframe>> segmentImages;
+
+  /// Segment ids that were explicitly attached at a host joint point.
+  ///
+  /// `figureKeyFor` treats every point beyond an `isAttached` joint as part of
+  /// the attached figure. That is not enough to detach safely: a pre-existing
+  /// child of the host can share the same joint and would otherwise be pulled
+  /// away together with the newly attached object. Recording the dragged
+  /// segments at attach time keeps detach scoped to exactly that object.
+  Map<int, List<String>> attachedSegments;
+
+  /// Per-frame overrides for properties that have no dedicated keyframe track
+  /// (curve handles, stroke width, image transform, text, per-segment
+  /// hidden/colour/layer...). Key: rounded frame -> `seg:<id>:<property>`.
+  final Map<double, Map<String, dynamic>> frameOverrides;
+
   Map<String, bool> figureCollision; // per-figure game-dev flag, key = figureKeyFor(root)
   List<LayerGroup> groups;
 
@@ -180,6 +265,8 @@ class Figure {
         opacity = {},
         colors = {},
         segmentImages = {},
+        attachedSegments = {},
+        frameOverrides = {},
         figureCollision = {},
         groups = [LayerGroup(id: defaultGroupId, name: 'Default')];
 
@@ -250,6 +337,12 @@ class Figure {
     final seg = segments.removeAt(idx);
     for (final g in groups) {
       g.segmentIds.remove(segId);
+    }
+    for (final joint in attachedSegments.keys.toList()) {
+      attachedSegments[joint]?.remove(segId);
+      if (attachedSegments[joint]?.isEmpty ?? true) {
+        attachedSegments.remove(joint);
+      }
     }
     repairRoots();
     return seg;
@@ -361,12 +454,40 @@ class Figure {
     return k1;
   }
 
-  void setFigureVisibility(int root, double time, bool visible) {
+  double? _nextAuthoredAfter(double time, Set<double> authoredTimes) {
+    final frame = time.roundToDouble();
+    double? next;
+    for (final t in authoredTimes) {
+      final rt = t.roundToDouble();
+      if (rt > frame && (next == null || rt < next)) next = rt;
+    }
+    return next;
+  }
+
+  void setFigureVisibility(
+    int root,
+    double time,
+    bool visible, {
+    Set<double>? authoredTimes,
+  }) {
     final key = root.toString();
     final track = visibility.putIfAbsent(key, () => []);
-    final existing = track
-        .where((kf) => (kf.time - time).abs() < 0.001)
-        .toList();
+    if (authoredTimes != null) {
+      final next = _nextAuthoredAfter(time, authoredTimes);
+      if (next != null) {
+        if (!track.any((kf) => (kf.time - next).abs() < 0.001)) {
+          track.add(VisibilityKeyframe(next, getFigureVisibility(root, next)));
+        }
+        final t1 = time.roundToDouble() + 1;
+        if (t1 < next &&
+            !track.any((kf) => (kf.time - t1).abs() < 0.001)) {
+          track.add(VisibilityKeyframe(t1, getFigureVisibility(root, t1)));
+        }
+        track.sort((a, b) => a.time.compareTo(b.time));
+      }
+    }
+    final existing =
+        track.where((kf) => (kf.time - time).abs() < 0.001).toList();
     if (existing.isNotEmpty) {
       existing.first.visible = visible;
     } else {
@@ -399,12 +520,30 @@ class Figure {
     }
   }
 
-  void setFigureOpacity(int root, double time, double val) {
+  void setFigureOpacity(
+    int root,
+    double time,
+    double val, {
+    Set<double>? authoredTimes,
+  }) {
     final key = root.toString();
     final track = opacity.putIfAbsent(key, () => []);
-    final existing = track
-        .where((kf) => (kf.time - time).abs() < 0.001)
-        .toList();
+    if (authoredTimes != null) {
+      final next = _nextAuthoredAfter(time, authoredTimes);
+      if (next != null) {
+        if (!track.any((kf) => (kf.time - next).abs() < 0.001)) {
+          track.add(OpacityKeyframe(next, getFigureOpacity(root, next)));
+        }
+        final t1 = time.roundToDouble() + 1;
+        if (t1 < next &&
+            !track.any((kf) => (kf.time - t1).abs() < 0.001)) {
+          track.add(OpacityKeyframe(t1, getFigureOpacity(root, t1)));
+        }
+        track.sort((a, b) => a.time.compareTo(b.time));
+      }
+    }
+    final existing =
+        track.where((kf) => (kf.time - time).abs() < 0.001).toList();
     if (existing.isNotEmpty) {
       existing.first.opacity = val;
     } else {
@@ -425,10 +564,36 @@ class Figure {
   List<OpacityKeyframe> getFigureOpacityKeyframes(int root) =>
       opacity[root.toString()] ?? [];
 
-  void setFigureColorOverride(int root, double time, String color) {
+  void setFigureColorOverride(
+    int root,
+    double time,
+    String color, {
+    Set<double>? authoredTimes,
+  }) {
     final key = root.toString();
     final track = colors.putIfAbsent(key, () => []);
-    final existing = track.where((kf) => (kf.time - time).abs() < 0.001).toList();
+    if (authoredTimes != null) {
+      final next = _nextAuthoredAfter(time, authoredTimes);
+      if (next != null) {
+        if (!track.any((kf) => (kf.time - next).abs() < 0.001)) {
+          final current = getFigureColorOverride(root, next);
+          if (current != null) {
+            track.add(FigureColorKeyframe(next, current));
+          }
+        }
+        final t1 = time.roundToDouble() + 1;
+        if (t1 < next &&
+            !track.any((kf) => (kf.time - t1).abs() < 0.001)) {
+          final current1 = getFigureColorOverride(root, t1);
+          if (current1 != null) {
+            track.add(FigureColorKeyframe(t1, current1));
+          }
+        }
+        track.sort((a, b) => a.time.compareTo(b.time));
+      }
+    }
+    final existing =
+        track.where((kf) => (kf.time - time).abs() < 0.001).toList();
     if (existing.isNotEmpty) {
       existing.first.color = color;
     } else {
@@ -460,9 +625,35 @@ class Figure {
     }
   }
 
-  void setSegmentImageIndex(String segId, double time, int imageIndex) {
+  void setSegmentImageIndex(
+    String segId,
+    double time,
+    int imageIndex, {
+    Set<double>? authoredTimes,
+  }) {
     final track = segmentImages.putIfAbsent(segId, () => []);
-    final existing = track.where((kf) => (kf.time - time).abs() < 0.001).toList();
+    if (authoredTimes != null) {
+      final next = _nextAuthoredAfter(time, authoredTimes);
+      if (next != null) {
+        if (!track.any((kf) => (kf.time - next).abs() < 0.001)) {
+          final current = getSegmentImageIndex(segId, next);
+          if (current != null) {
+            track.add(SegmentImageKeyframe(next, current));
+          }
+        }
+        final t1 = time.roundToDouble() + 1;
+        if (t1 < next &&
+            !track.any((kf) => (kf.time - t1).abs() < 0.001)) {
+          final current1 = getSegmentImageIndex(segId, t1);
+          if (current1 != null) {
+            track.add(SegmentImageKeyframe(t1, current1));
+          }
+        }
+        track.sort((a, b) => a.time.compareTo(b.time));
+      }
+    }
+    final existing =
+        track.where((kf) => (kf.time - time).abs() < 0.001).toList();
     if (existing.isNotEmpty) {
       existing.first.imageIndex = imageIndex;
     } else {
@@ -484,6 +675,144 @@ class Figure {
     }
     return found ? val : null;
   }
+
+  // ---------------------------------------------------------------------------
+  // Generic per-frame overrides
+  // ---------------------------------------------------------------------------
+
+  /// All frame times that contain any authored keyframe/override in this
+  /// figure. Point-track times live in [FigureAnimation] and must be merged by
+  /// the caller when protecting boundaries across systems.
+  Set<double> authoredFrameTimes() {
+    final times = <double>{...frameOverrides.keys};
+    for (final track in visibility.values) {
+      for (final kf in track) {
+        times.add(kf.time.roundToDouble());
+      }
+    }
+    for (final track in opacity.values) {
+      for (final kf in track) {
+        times.add(kf.time.roundToDouble());
+      }
+    }
+    for (final track in colors.values) {
+      for (final kf in track) {
+        times.add(kf.time.roundToDouble());
+      }
+    }
+    for (final track in segmentImages.values) {
+      for (final kf in track) {
+        times.add(kf.time.roundToDouble());
+      }
+    }
+    return times;
+  }
+
+  /// Records [value] as the value of [key] at [time]. Later frames keep this
+  /// value until another override is written (hold semantics).
+  void setFrameOverride(String key, dynamic value, double time) {
+    final frame = time.roundToDouble();
+    frameOverrides.putIfAbsent(frame, () => <String, dynamic>{})[key] = value;
+  }
+
+  /// If an authored frame exists after [time] and has no explicit override for
+  /// [key], pin the value it currently resolves to so editing [time] does not
+  /// leak forward into already-authored frames. Also pins [time]+1 when there
+  /// is a gap, so un-authored in-between frames keep their old value.
+  void protectNextOverrideBoundary(
+    String key,
+    double time,
+    dynamic fallback,
+    Set<double> authoredTimes,
+  ) {
+    final frame = time.roundToDouble();
+    double? next;
+    for (final t in authoredTimes) {
+      final rt = t.roundToDouble();
+      if (rt > frame && (next == null || rt < next)) next = rt;
+    }
+    if (next == null) return;
+
+    void pin(double target) {
+      final frameMap = frameOverrides[target];
+      if (frameMap != null && frameMap.containsKey(key)) return;
+      final resolved = frameObject(key, target, fallback);
+      frameOverrides.putIfAbsent(target, () => <String, dynamic>{})[key] =
+          resolved;
+    }
+
+    pin(next);
+    final t1 = frame + 1;
+    if (t1 < next) pin(t1);
+  }
+
+  /// Seeds frame 0 with [value] when [key] has no earlier override. Call this
+  /// with the property's current value BEFORE a tool mutates it, so scrubbing
+  /// back to earlier frames still shows the original state.
+  void captureFrameOverride(String key, dynamic value) {
+    frameOverrides
+        .putIfAbsent(0.0, () => <String, dynamic>{})
+        .putIfAbsent(key, () => value);
+  }
+
+  static final Object _noFrameOverride = Object();
+
+  /// Raw override at or before [time]. [_noFrameOverride] means "not set",
+  /// which lets nullable values (e.g. `text = null`) be stored correctly.
+  Object? _frameRaw(String key, double time) {
+    double? best;
+    for (final t in frameOverrides.keys) {
+      if (t <= time + 0.0001 && (best == null || t > best)) best = t;
+    }
+    if (best == null) return _noFrameOverride;
+    final frame = frameOverrides[best]!;
+    if (!frame.containsKey(key)) return _noFrameOverride;
+    return frame[key];
+  }
+
+  bool hasFrameOverride(String key, double time) =>
+      !identical(_frameRaw(key, time), _noFrameOverride);
+
+  /// Latest override for [key] at or before [time], or null when none exists.
+  T? frameValue<T>(String key, double time) {
+    final raw = _frameRaw(key, time);
+    if (identical(raw, _noFrameOverride)) return null;
+    return raw is T ? raw : null;
+  }
+
+  /// Override of any type (numbers, strings, bools, `auto` dimensions...).
+  dynamic frameObject(String key, double time, dynamic fallback) {
+    final raw = _frameRaw(key, time);
+    return identical(raw, _noFrameOverride) ? fallback : raw;
+  }
+
+  double frameDouble(String key, double time, double fallback) =>
+      frameValue<num>(key, time)?.toDouble() ?? fallback;
+
+  int frameInt(String key, double time, int fallback) =>
+      frameValue<num>(key, time)?.round() ?? fallback;
+
+  bool frameBool(String key, double time, bool fallback) =>
+      frameValue<bool>(key, time) ?? fallback;
+
+  String frameString(String key, double time, String fallback) =>
+      frameValue<String>(key, time) ?? fallback;
+
+  String? frameNullableString(String key, double time, String? fallback) {
+    final raw = _frameRaw(key, time);
+    if (identical(raw, _noFrameOverride)) return fallback;
+    return raw is String ? raw : null;
+  }
+
+  double? frameNullableDouble(String key, double time, double? fallback) {
+    final raw = _frameRaw(key, time);
+    if (identical(raw, _noFrameOverride)) return fallback;
+    return raw is num ? raw.toDouble() : null;
+  }
+
+  /// Resolves every visual property of [seg] at [time].
+  SegmentFrameStyle styleFor(Segment seg, double time, {bool enabled = true}) =>
+      SegmentFrameStyle(this, seg, time, enabled: enabled);
 
   /// Returns the connected set of point indices containing [rootIndex].
   Set<int> connectedComponent(int rootIndex) {
@@ -606,6 +935,14 @@ class Figure {
       });
       figureCollision = newFC;
     }
+    if (attachedSegments.isNotEmpty) {
+      final newAttached = <int, List<String>>{};
+      attachedSegments.forEach((joint, ids) {
+        if (removedSet.contains(joint)) return;
+        newAttached[remap(joint)] = ids;
+      });
+      attachedSegments = newAttached;
+    }
     return removed;
   }
 
@@ -641,6 +978,20 @@ class Figure {
           ? movedFigureRoot - 1
           : movedFigureRoot;
       rootIndices.remove(remappedRoot);
+    }
+    // Attachment joints are stored by point index, so they must follow the
+    // same renumbering as the points when the dragged point is removed.
+    if (attachedSegments.isNotEmpty) {
+      final remapped = <int, List<String>>{};
+      attachedSegments.forEach((joint, ids) {
+        final newJoint = joint == movedIdx
+            ? newTarget
+            : joint > movedIdx
+                ? joint - 1
+                : joint;
+        remapped[newJoint] = ids;
+      });
+      attachedSegments = remapped;
     }
     // Re-key figure-scoped overrides: keys that reference a point inside the
     // moved component follow that figure to its new per-figure key (so colour,
@@ -741,6 +1092,105 @@ class Figure {
       if (rk == null) return null;
       return rk == fromKey ? toKey.toString() : k;
     });
+  }
+
+  /// Remembers which segments belong to the figure being attached at [jointIdx].
+  void setAttachedSegments(int jointIdx, Iterable<String> segmentIds) {
+    final ids = segmentIds.toSet().toList();
+    if (ids.isEmpty) {
+      attachedSegments.remove(jointIdx);
+    } else {
+      attachedSegments[jointIdx] = ids;
+    }
+  }
+
+  /// Detaches exactly the object recorded at [jointIdx].
+  ///
+  /// Returns the new root created for the detached object plus the points and
+  /// segments that moved with it. A host child that merely shares the joint is
+  /// not included because its segment id was never recorded as attached.
+  ({int newRoot, Set<int> pointIndices, Set<String> segmentIds})?
+      detachAttachedAt(int jointIdx) {
+    final directIds = attachedSegments[jointIdx]?.toSet() ?? <String>{};
+    if (directIds.isEmpty ||
+        jointIdx < 0 ||
+        jointIdx >= points.length) {
+      return null;
+    }
+
+    // Include figures attached further down the detached object's tree.
+    final allIds = <String>{...directIds};
+    final nestedKeys = <int>{jointIdx};
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final entry in attachedSegments.entries) {
+        if (!nestedKeys.contains(entry.key)) continue;
+        for (final id in entry.value) {
+          if (allIds.add(id)) changed = true;
+        }
+      }
+      final touched = <int>{};
+      for (final s in segments) {
+        if (!allIds.contains(s.id)) continue;
+        touched.add(s.point1Index);
+        touched.add(s.point2Index);
+      }
+      for (final key in attachedSegments.keys) {
+        if (touched.contains(key) && nestedKeys.add(key)) changed = true;
+      }
+    }
+
+    final attachSegs = segments.where((s) => allIds.contains(s.id)).toList();
+    if (attachSegs.isEmpty) {
+      attachedSegments.remove(jointIdx);
+      return null;
+    }
+    final attachPts = <int>{};
+    for (final s in attachSegs) {
+      attachPts.add(s.point1Index);
+      attachPts.add(s.point2Index);
+    }
+    attachPts.remove(jointIdx);
+    if (attachPts.isEmpty) {
+      attachedSegments.remove(jointIdx);
+      return null;
+    }
+
+    final newRoot = addPoint(points[jointIdx].x, points[jointIdx].y);
+    for (final s in segments) {
+      if (!allIds.contains(s.id)) continue;
+      if (s.point1Index == jointIdx) s.point1Index = newRoot;
+      if (s.point2Index == jointIdx) s.point2Index = newRoot;
+    }
+    if (!rootIndices.contains(newRoot)) rootIndices.add(newRoot);
+    repairRoots();
+    points[jointIdx].isAttached = false;
+    moveFigureOverrides(jointIdx, newRoot);
+    attachedSegments.remove(jointIdx);
+
+    return (
+      newRoot: newRoot,
+      pointIndices: attachPts,
+      segmentIds: allIds,
+    );
+  }
+
+  /// Returns a copy of [attachedSegments] with imported point/segment ids
+  /// remapped, used when merging a saved figure that already has attachments.
+  Map<int, List<String>> remappedAttachedSegments(
+    Map<String, String> segIdMap,
+    Map<int, int> pointIndexMap,
+  ) {
+    final mapped = <int, List<String>>{};
+    attachedSegments.forEach((joint, ids) {
+      final newJoint = pointIndexMap[joint] ?? joint;
+      mapped[newJoint] = ids
+          .map((id) => segIdMap[id] ?? id)
+          .where((id) => id.isNotEmpty)
+          .toList();
+    });
+    return mapped;
   }
 
   /// Splits a shared joint so [jointIdx] stops connecting to
@@ -899,6 +1349,10 @@ class Figure {
             (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
         'segmentImages': segmentImages.map(
             (k, v) => MapEntry(k, v.map((kf) => kf.toJson()).toList())),
+        'attachedSegments': attachedSegments.map(
+            (k, v) => MapEntry(k.toString(), List<String>.from(v))),
+        'frameOverrides': frameOverrides.map(
+            (k, v) => MapEntry(k.toString(), Map<String, dynamic>.from(v))),
         'figureCollision': figureCollision,
         'groups': groups.map((g) => g.toJson()).toList(),
       };
@@ -906,7 +1360,7 @@ class Figure {
   /// Segments ordered for painting: group order first (the default group
   /// paints at the bottom, i.e. first), then each group's own [Segment.layer]
   /// order.
-  List<Segment> segmentsInDrawOrder() {
+  List<Segment> segmentsInDrawOrder([double? time]) {
     final ordered = orderedGroups();
     final keyOf = <String, int>{};
     for (var i = 0; i < ordered.length; i++) {
@@ -916,7 +1370,9 @@ class Figure {
         final ka = keyOf[groupOf(a.id)] ?? 0;
         final kb = keyOf[groupOf(b.id)] ?? 0;
         if (ka != kb) return ka.compareTo(kb);
-        return a.layer.compareTo(b.layer);
+        final la = time == null ? a.layer : frameInt('seg:${a.id}:layer', time, a.layer);
+        final lb = time == null ? b.layer : frameInt('seg:${b.id}:layer', time, b.layer);
+        return la.compareTo(lb);
       });
     return sorted;
   }
@@ -1020,6 +1476,27 @@ class Figure {
       });
     }
 
+    final rawAttached = data['attachedSegments'];
+    if (rawAttached is Map) {
+      rawAttached.forEach((k, v) {
+        final joint = int.tryParse(k.toString());
+        if (joint == null || joint < 0 || joint >= fig.points.length) return;
+        if (v is! List) return;
+        final ids = v.whereType<String>().where((id) => id.isNotEmpty).toList();
+        if (ids.isNotEmpty) fig.attachedSegments[joint] = ids;
+      });
+    }
+
+    final rawOverrides = data['frameOverrides'];
+    if (rawOverrides is Map) {
+      rawOverrides.forEach((k, v) {
+        final frame = double.tryParse(k.toString());
+        if (frame == null || v is! Map) return;
+        fig.frameOverrides[frame] =
+            v.map((key, value) => MapEntry(key.toString(), value));
+      });
+    }
+
     final rawGroups = data['groups'];
     if (rawGroups is List) {
       fig.groups = rawGroups
@@ -1056,6 +1533,147 @@ class Figure {
 
   factory Figure.fromJsonString(String json) =>
       Figure.fromJson(jsonDecodeSafe(json));
+
+  /// Builds a standalone figure from [pointIndices], remapping every
+  /// index/id-based key and giving each copied segment a fresh id.
+  ///
+  /// Used by the animation "re-create" flow: a figure deleted at one frame is
+  /// hidden (not removed), so bringing it back later must create a NEW object
+  /// with its own per-frame state instead of sharing overrides with the
+  /// original.
+  Figure extractSubFigure(Iterable<int> pointIndices) {
+    final keep = pointIndices.toSet()
+      ..removeWhere((i) => i < 0 || i >= points.length);
+    final ordered = keep.toList()..sort();
+    final pointMap = <int, int>{};
+    for (var i = 0; i < ordered.length; i++) {
+      pointMap[ordered[i]] = i;
+    }
+
+    final sub = Figure(name)
+      ..canvasWidth = canvasWidth
+      ..canvasHeight = canvasHeight
+      ..fps = fps
+      ..canvasColor = canvasColor;
+    for (final old in ordered) {
+      sub.points.add(points[old].clone());
+    }
+
+    final segIdMap = <String, String>{};
+    for (final s in segments) {
+      final p1 = pointMap[s.point1Index];
+      final p2 = pointMap[s.point2Index];
+      if (p1 == null || p2 == null) continue;
+      final copy = s.clone();
+      final newId = Segment(copy.type).id;
+      segIdMap[s.id] = newId;
+      copy
+        ..id = newId
+        ..point1Index = p1
+        ..point2Index = p2;
+      sub.segments.add(copy);
+    }
+    sub.rootIndices = rootIndices
+        .where(keep.contains)
+        .map((r) => pointMap[r]!)
+        .toList()
+      ..sort();
+
+    visibility.forEach((key, frames) {
+      final root = int.tryParse(key);
+      if (root == null || !keep.contains(root)) return;
+      sub.visibility[pointMap[root]!.toString()] =
+          frames.map((kf) => kf.clone()).toList();
+    });
+    opacity.forEach((key, frames) {
+      final root = int.tryParse(key);
+      if (root == null || !keep.contains(root)) return;
+      sub.opacity[pointMap[root]!.toString()] =
+          frames.map((kf) => kf.clone()).toList();
+    });
+    colors.forEach((key, frames) {
+      final root = int.tryParse(key);
+      if (root == null || !keep.contains(root)) return;
+      sub.colors[pointMap[root]!.toString()] =
+          frames.map((kf) => kf.clone()).toList();
+    });
+    segmentImages.forEach((key, frames) {
+      final newId = segIdMap[key];
+      if (newId == null) return;
+      sub.segmentImages[newId] = frames.map((kf) => kf.clone()).toList();
+    });
+    figureCollision.forEach((key, value) {
+      final root = int.tryParse(key);
+      if (root == null || !keep.contains(root)) return;
+      sub.figureCollision[pointMap[root]!.toString()] = value;
+    });
+    cycleFills.forEach((key, entry) {
+      final mapped = key
+          .split(',')
+          .map(int.tryParse)
+          .whereType<int>()
+          .map((p) => pointMap[p])
+          .whereType<int>()
+          .toList();
+      if (mapped.length != key.split(',').length || mapped.isEmpty) return;
+      mapped.sort();
+      sub.cycleFills[mapped.join(',')] = entry.clone();
+    });
+    attachedSegments.forEach((joint, ids) {
+      final newJoint = pointMap[joint];
+      if (newJoint == null) return;
+      final mappedIds = ids.map((id) => segIdMap[id] ?? id).toList();
+      if (mappedIds.isNotEmpty) sub.attachedSegments[newJoint] = mappedIds;
+    });
+
+    String? remapOverrideKey(String key) {
+      final parts = key.split(':');
+      if (parts.length >= 3 && parts[0] == 'seg') {
+        final id = segIdMap[parts[1]];
+        return id == null ? null : ['seg', id, ...parts.skip(2)].join(':');
+      }
+      if (parts.length >= 3 && parts[0] == 'cycle') {
+        final ids = parts[1]
+            .split(',')
+            .map(int.tryParse)
+            .whereType<int>()
+            .map((p) => pointMap[p])
+            .whereType<int>()
+            .toList();
+        if (ids.isEmpty || ids.length != parts[1].split(',').length) {
+          return null;
+        }
+        ids.sort();
+        return ['cycle', ids.join(','), ...parts.skip(2)].join(':');
+      }
+      return null;
+    }
+
+    frameOverrides.forEach((time, values) {
+      final mapped = <String, dynamic>{};
+      values.forEach((key, value) {
+        final newKey = remapOverrideKey(key.toString());
+        if (newKey != null) mapped[newKey] = value;
+      });
+      if (mapped.isNotEmpty) sub.frameOverrides[time] = mapped;
+    });
+
+    // Groups keep the SOURCE segment ids here: mergeGroupsFrom() remaps them
+    // with segIdMap when the extracted figure is merged back into a scene.
+    for (final g in groups) {
+      final ids = g.segmentIds.where(segIdMap.keys.contains).toList();
+      if (ids.isEmpty) continue;
+      sub.groups.add(LayerGroup(
+        id: g.id,
+        name: g.name,
+        segmentIds: ids,
+        visible: g.visible,
+        locked: g.locked,
+      ));
+    }
+    sub.ensureDefaultGroup();
+    return sub;
+  }
 
   Figure clone() => Figure.fromJson(toJson());
 }

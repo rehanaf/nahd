@@ -1,4 +1,4 @@
-﻿part of 'main_menu_screen.dart';
+part of 'main_menu_screen.dart';
 
 // =========================================================================
 // Menu / sort / name / confirm / profile sheets
@@ -27,14 +27,17 @@ class _MenuSheet extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: options.map((item) {
               final color = item.color ?? palette.text;
               return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -77,8 +80,10 @@ class _SortSheet extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,6 +103,7 @@ class _SortSheet extends StatelessWidget {
               ...options.map((opt) {
                 final active = current.name == opt.$1;
                 return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -152,6 +158,8 @@ class _NameSheetState extends State<_NameSheet> {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Column(
@@ -241,6 +249,8 @@ class _ConfirmSheet extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Column(
@@ -329,6 +339,8 @@ class _ProfileSheet extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
+        left: false,
+        right: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           child: Column(
@@ -507,6 +519,38 @@ class _ProfileSheet extends StatelessWidget {
                       ),
                     ),
                   ),
+                   const SizedBox(height: 8),
+                   InkWell(
+                     onTap: () async {
+                       Navigator.pop(context);
+                       await showUpdateDialogIfAny(context,
+                           showSnackIfUpToDate: true);
+                     },
+                     borderRadius: BorderRadius.circular(12),
+                     child: Container(
+                       padding: const EdgeInsets.symmetric(
+                           horizontal: 12, vertical: 12),
+                       decoration: BoxDecoration(
+                         color: palette.background,
+                         borderRadius: BorderRadius.circular(12),
+                       ),
+                       child: Row(
+                         children: [
+                           const Icon(Icons.system_update,
+                               size: 16, color: Color(0xFF3B82F6)),
+                           const SizedBox(width: 8),
+                           Text(
+                              'Periksa Pembaruan',
+                             style: TextStyle(
+                               color: palette.text,
+                               fontSize: 14,
+                               fontWeight: FontWeight.w600,
+                             ),
+                           ),
+                         ],
+                       ),
+                     ),
+                   ),
                   const SizedBox(height: 20),
                   Divider(color: palette.border, height: 1),
                   const SizedBox(height: 12),

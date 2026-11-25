@@ -7,12 +7,8 @@ part of 'editor_screen.dart';
 class _ExportOption {
   final String key;
   final String label;
-  const _ExportOption.fps()
-      : key = 'fps',
-        label = 'Frames per second (1–60)';
-  const _ExportOption.scale()
-      : key = 'scale',
-        label = 'Scale (1–8)';
+  const _ExportOption.fps() : key = 'fps', label = 'Frames per second (1–60)';
+  const _ExportOption.scale() : key = 'scale', label = 'Scale (1–8)';
 }
 
 class _ExportOptions {
@@ -31,7 +27,11 @@ class _MenuItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _MenuItem({required this.icon, required this.label, required this.onTap});
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +78,10 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
     setState(() => _poses = poses);
   }
 
-  Future<void> _promptName({required String initial, required Future<void> Function(String) onOk}) async {
+  Future<void> _promptName({
+    required String initial,
+    required Future<void> Function(String) onOk,
+  }) async {
     final controller = TextEditingController(text: initial);
     final result = await showDialog<bool>(
       context: context,
@@ -160,7 +163,6 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
     final palette = Theme.of(context).appColors;
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: palette.backgroundElement,
@@ -170,11 +172,14 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Pose Library',
-              style: TextStyle(
-                  color: palette.text,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600)),
+          Text(
+            'Pose Library',
+            style: TextStyle(
+              color: palette.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 8),
           const Text(
             'Guides for posing your rig. Save a snapshot of the figure layout '
@@ -191,21 +196,24 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
           Expanded(
             child: _poses.isEmpty
                 ? Center(
-                    child: Text('No poses yet',
-                        style: TextStyle(color: palette.textSecondary)),
+                    child: Text(
+                      'No poses yet',
+                      style: TextStyle(color: palette.textSecondary),
+                    ),
                   )
                 : ListView.separated(
                     itemCount: _poses.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (ctx, i) {
                       final pose = _poses[i];
                       return ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.accessibility_new),
-                        title: Text(pose.name,
-                            style: const TextStyle(fontSize: 13)),
+                        title: Text(
+                          pose.name,
+                          style: const TextStyle(fontSize: 13),
+                        ),
                         subtitle: Text(
                           '${pose.figure().points.length} points',
                           style: const TextStyle(fontSize: 11),
@@ -233,5 +241,3 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
     );
   }
 }
-
-

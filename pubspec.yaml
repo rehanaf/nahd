@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.7+8
 
 environment:
   sdk: ^3.11.5
@@ -40,6 +40,13 @@ dependencies:
   flutter_colorpicker: ^1.1.0
   xml: ^6.5.0
   image: 4.8.0
+  flutter_lucide: ^1.79.0
+
+  # In-app update (APK luar Play Store)
+  http: ^1.5.0
+  path_provider: ^2.1.6
+  package_info_plus: ^9.0.1
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -75,17 +82,17 @@ flutter:
   uses-material-design: true
 
   fonts:
-    - family: Inter
+    - family: Onest
       fonts:
-        - asset: assets/fonts/Inter-400.ttf
+        - asset: assets/fonts/Onest-400.ttf
           weight: 400
-        - asset: assets/fonts/Inter-500.ttf
+        - asset: assets/fonts/Onest-500.ttf
           weight: 500
-        - asset: assets/fonts/Inter-600.ttf
+        - asset: assets/fonts/Onest-600.ttf
           weight: 600
-        - asset: assets/fonts/Inter-700.ttf
+        - asset: assets/fonts/Onest-700.ttf
           weight: 700
-        - asset: assets/fonts/Inter-800.ttf
+        - asset: assets/fonts/Onest-800.ttf
           weight: 800
 
   # To add assets to your application, add an assets section, like this:

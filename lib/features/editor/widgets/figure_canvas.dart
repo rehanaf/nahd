@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/render/opacity_groups.dart';
 import '../../../core/models/figure.dart';
 import '../../../core/models/figure_animation.dart';
 import '../../../core/models/segment.dart';
@@ -232,6 +233,32 @@ class _FigureCanvasState extends State<FigureCanvas> {
   }
 
   ui.Image? _imageMeta(String uri) => _imageCache[uri];
+
+  Size _resolveStyleImageSize(SegmentFrameStyle style, ui.Image? meta) {
+    var w = style.imageWidth is num
+        ? (style.imageWidth as num).toDouble()
+        : 100.0;
+    var h = style.imageHeight is num
+        ? (style.imageHeight as num).toDouble()
+        : 100.0;
+    final wAuto = style.imageWidth == 'auto';
+    final hAuto = style.imageHeight == 'auto';
+    if (meta != null && meta.width > 0 && meta.height > 0) {
+      final ar = meta.width / meta.height;
+      if (wAuto && hAuto) {
+        w = 100;
+        h = 100 / ar;
+      } else if (wAuto) {
+        w = h * ar;
+      } else if (hAuto) {
+        h = w / ar;
+      }
+    } else {
+      if (wAuto) w = 100;
+      if (hAuto) h = 100;
+    }
+    return Size(w, h);
+  }
 
   Size _resolveImageSize(Segment seg, ui.Image? meta) {
     var w = seg.imageWidth is num ? (seg.imageWidth as num).toDouble() : 100.0;
@@ -491,12 +518,22 @@ class _FigureCanvasState extends State<FigureCanvas> {
           final p2 = fig.points[seg.point2Index];
           final midX = (p1.x + p2.x) / 2;
           final midY = (p1.y + p2.y) / 2;
-          seg.imageOffsetX = e.value.x - midX;
-          seg.imageOffsetY = e.value.y - midY;
+          final style = fig.styleFor(seg, widget.controller.currentTime,
+              enabled: widget.controller.isAnimateMode);
+          final nx = e.value.x - midX;
+          final ny = e.value.y - midY;
+          widget.controller.recordSegmentValue(
+              seg, 'imageOffsetX', style.imageOffsetX, nx);
+          widget.controller.recordSegmentValue(
+              seg, 'imageOffsetY', style.imageOffsetY, ny);
+          seg.imageOffsetX = nx;
+          seg.imageOffsetY = ny;
           final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-          seg.imageRotate =
-              (d.anchorImgRot[seg.id] ?? segAngle * 180 / math.pi) -
+          final nr = (d.anchorImgRot[seg.id] ?? segAngle * 180 / math.pi) -
               segAngle * 180 / math.pi;
+          widget.controller.recordSegmentValue(
+              seg, 'imageRotate', style.imageRotate, nr);
+          seg.imageRotate = nr;
         }
         widget.controller.forceUpdate();
       }
@@ -529,8 +566,16 @@ class _FigureCanvasState extends State<FigureCanvas> {
         // Control is stored as an offset from the segment midpoint; track the
         // pointer by starting from the grabbed offset and adding the mouse
         // delta so the handle follows 1:1.
-        seg.controlDX = d.startPtX + (w.dx - d.startX);
-        seg.controlDY = d.startPtY + (w.dy - d.startY);
+        final style = fig.styleFor(seg, widget.controller.currentTime,
+            enabled: widget.controller.isAnimateMode);
+        final ndx = d.startPtX + (w.dx - d.startX);
+        final ndy = d.startPtY + (w.dy - d.startY);
+        widget.controller.recordSegmentValue(
+            seg, 'controlDX', style.controlDX, ndx);
+        widget.controller.recordSegmentValue(
+            seg, 'controlDY', style.controlDY, ndy);
+        seg.controlDX = ndx;
+        seg.controlDY = ndy;
         widget.controller.forceUpdate();
       }
     }
@@ -573,12 +618,22 @@ class _FigureCanvasState extends State<FigureCanvas> {
       d.initSegs.forEach((segId, initVal) {
         final seg = fig.getSegment(segId);
         if (seg != null) {
-          seg.width = initVal.width * factor;
+          final style = fig.styleFor(seg, widget.controller.currentTime,
+              enabled: widget.controller.isAnimateMode);
+          final nw = initVal.width * factor;
+          widget.controller.recordSegmentValue(seg, 'width', style.width, nw);
+          seg.width = nw;
           if (seg.imageWidth is num) {
-            seg.imageWidth = initVal.imageWidth * factor;
+            final niw = initVal.imageWidth * factor;
+            widget.controller.recordSegmentValue(
+                seg, 'imageWidth', style.imageWidth, niw);
+            seg.imageWidth = niw;
           }
           if (seg.imageHeight is num) {
-            seg.imageHeight = initVal.imageHeight * factor;
+            final nih = initVal.imageHeight * factor;
+            widget.controller.recordSegmentValue(
+                seg, 'imageHeight', style.imageHeight, nih);
+            seg.imageHeight = nih;
           }
         }
       });
@@ -608,7 +663,7 @@ class _FigureCanvasState extends State<FigureCanvas> {
     }
 
     // Animation recording.
-    if (widget.controller.isAnimateMode && !d.creating) {
+    if (widget.controller.isAnimateMode) {
       final recPts = <int>{};
       if (d.connPts.isNotEmpty) {
         recPts.addAll(d.connPts);
@@ -622,16 +677,18 @@ class _FigureCanvasState extends State<FigureCanvas> {
           recPts.add(seg.point2Index);
         }
       }
+      if (d.creating && fig.segments.isNotEmpty) {
+        final seg = fig.segments.last;
+        recPts.add(seg.point1Index);
+        recPts.add(seg.point2Index);
+      }
       if (recPts.isNotEmpty) {
-        final anim = widget.controller.ensureAnimation();
+        final times = widget.controller.authoredFrameTimes();
         for (final i in recPts) {
           if (i < fig.points.length) {
             final p = fig.points[i];
-            anim.setPointPose(widget.controller.currentTime, i, p.x, p.y);
+            widget.controller.recordPointPose(i, p.x, p.y, authoredTimes: times);
           }
-        }
-        if (anim.duration > widget.controller.duration) {
-          widget.controller.setDuration(anim.duration);
         }
       }
     }
@@ -671,7 +728,11 @@ class _FigureCanvasState extends State<FigureCanvas> {
   void _rotateCurveControls(Figure fig, _DragState d, double angleDelta) {
     final npSet = d.connPts.toSet();
     for (final s in fig.segments) {
-      if (!s.curved || s.controlDX == null || s.controlDY == null) continue;
+      final style = fig.styleFor(s, widget.controller.currentTime,
+          enabled: widget.controller.isAnimateMode);
+      if (!style.curved || style.controlDX == null || style.controlDY == null) {
+        continue;
+      }
       // Rotate whenever at least one endpoint moves: segments attached to the
       // (stationary) pivot have the pivot endpoint outside the rotating set,
       // yet their curve handle must follow the rotation too.
@@ -682,22 +743,34 @@ class _FigureCanvasState extends State<FigureCanvas> {
       if (orig == null) continue;
       final cosA = math.cos(angleDelta);
       final sinA = math.sin(angleDelta);
-      s.controlDX = orig.dx * cosA - orig.dy * sinA;
-      s.controlDY = orig.dx * sinA + orig.dy * cosA;
+      final ndx = orig.dx * cosA - orig.dy * sinA;
+      final ndy = orig.dx * sinA + orig.dy * cosA;
+      widget.controller.recordSegmentValue(s, 'controlDX', style.controlDX, ndx);
+      widget.controller.recordSegmentValue(s, 'controlDY', style.controlDY, ndy);
+      s.controlDX = ndx;
+      s.controlDY = ndy;
     }
   }
 
   void _scaleCurveControls(Figure fig, _DragState d, double factor) {
     final npSet = d.connPts.toSet();
     for (final s in fig.segments) {
-      if (!s.curved || s.controlDX == null || s.controlDY == null) continue;
+      final style = fig.styleFor(s, widget.controller.currentTime,
+          enabled: widget.controller.isAnimateMode);
+      if (!style.curved || style.controlDX == null || style.controlDY == null) {
+        continue;
+      }
       if (!npSet.contains(s.point1Index) && !npSet.contains(s.point2Index)) {
         continue;
       }
       final orig = d.fkCtrl[s.id];
       if (orig == null) continue;
-      s.controlDX = orig.dx * factor;
-      s.controlDY = orig.dy * factor;
+      final ndx = orig.dx * factor;
+      final ndy = orig.dy * factor;
+      widget.controller.recordSegmentValue(s, 'controlDX', style.controlDX, ndx);
+      widget.controller.recordSegmentValue(s, 'controlDY', style.controlDY, ndy);
+      s.controlDX = ndx;
+      s.controlDY = ndy;
     }
   }
 
@@ -730,7 +803,13 @@ class _FigureCanvasState extends State<FigureCanvas> {
               (s.point1Index == d.ptIdx && s.point2Index == i) ||
               (s.point1Index == i && s.point2Index == d.ptIdx));
           if (alreadyConnected) continue;
-          widget.controller.joinPoints(d.ptIdx, i);
+          final joint = widget.controller.joinPoints(d.ptIdx, i);
+          // joinPoints removes d.ptIdx and renumbers the points after it, so
+          // the drag state must follow the surviving index before the generic
+          // recorder at the end of _handleTouchMove runs.
+          widget.controller.recordPointsAtCurrentFrame([joint]);
+          d.ptIdx = joint;
+          d.connPts = const <int>[];
           d.jointDone = true;
           d.active = false;
           return;
@@ -776,6 +855,8 @@ class _FigureCanvasState extends State<FigureCanvas> {
         : detachSeg.point1Index;
     widget.controller.splitJoint(
         d.ptIdx, otherIdx, d.startPtX, d.startPtY);
+    // splitJoint appends the copied point (no index renumbering), so the
+    // dragged index stays valid and keeps recording normally.
     d.jointDone = true;
   }
 
@@ -793,7 +874,15 @@ class _FigureCanvasState extends State<FigureCanvas> {
     if (movedDist < threshold * 2) return;
 
     final draggedComp = fig.connectedComponent(d.ptIdx);
-    
+    // Remember exactly which segments are being attached so a later detach
+    // cannot mistake a pre-existing child of the host for the attached object.
+    final draggedSegIds = fig.segments
+        .where((s) =>
+            draggedComp.contains(s.point1Index) &&
+            draggedComp.contains(s.point2Index))
+        .map((s) => s.id)
+        .toList();
+
     for (var i = 0; i < fig.points.length; i++) {
       if (i == d.ptIdx) continue;
       if (draggedComp.contains(i)) continue;
@@ -812,7 +901,23 @@ class _FigureCanvasState extends State<FigureCanvas> {
         // figure-key remap inside joinPoints keeps overrides (colour, etc.)
         // scoped to the attached figure.
         fig.points[i].isAttached = true;
-        widget.controller.joinPoints(d.ptIdx, i);
+        final movedIdx = d.ptIdx;
+        final joint = widget.controller.joinPoints(movedIdx, i);
+        fig.setAttachedSegments(joint, draggedSegIds);
+
+        // The attach snap moved the whole object onto the host joint, and
+        // joinPoints removed the root point and renumbered everything past it.
+        // Write those FINAL positions at this frame under the new indices;
+        // otherwise the keyframes keep the pre-snap pose (or land on a point
+        // that now belongs to a different object).
+        final remapped = <int>[
+          joint,
+          for (final p in draggedComp)
+            if (p != movedIdx) (p > movedIdx ? p - 1 : p),
+        ];
+        widget.controller.recordPointsAtCurrentFrame(remapped);
+        d.ptIdx = joint;
+        d.connPts = remapped;
         d.jointDone = true;
         d.active = false;
         return;
@@ -898,6 +1003,7 @@ class _FigureCanvasState extends State<FigureCanvas> {
                   palette: palette,
                   imageFor: _imageFor,
                   imageVersion: _imageVersion,
+                  revision: widget.controller.revision,
                 ),
               );
             },

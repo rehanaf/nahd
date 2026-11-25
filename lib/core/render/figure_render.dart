@@ -8,6 +8,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
+import 'opacity_groups.dart';
 import '../models/figure.dart';
 import '../models/figure_animation.dart';
 import '../models/segment.dart';
@@ -73,8 +74,12 @@ class FigureFramePainter extends CustomPainter {
       Paint()..color = parseHexColor(figure.canvasColor) ?? const Color(0xFFFFFFFF),
     );
 
-    _paintCycleFills(canvas);
-    _paintSegments(canvas);
+    // Fills and segments with the same opacity are painted into one layer so
+    // overlapping parts do not stack their alpha (same logic as onion skin).
+    final opacityGroups = OpacityPaintGroups();
+    _paintCycleFills(canvas, opacityGroups);
+    _paintSegments(canvas, opacityGroups);
+    opacityGroups.paint(canvas);
 
     canvas.restore();
   }
@@ -83,10 +88,11 @@ class FigureFramePainter extends CustomPainter {
   // Segments
   // -------------------------------------------------------------------------
 
-  void _paintSegments(Canvas canvas) {
-    final sorted = figure.segmentsInDrawOrder();
+  void _paintSegments(Canvas canvas, OpacityPaintGroups groups) {
+    final sorted = figure.segmentsInDrawOrder(animate ? time : null);
     for (final seg in sorted) {
-      if (seg.hidden || seg.isNone) continue;
+      final style = figure.styleFor(seg, time, enabled: animate);
+      if (style.hidden || seg.isNone) continue;
       if (animate && !_visibleAtSeg(seg)) continue;
       if (seg.point1Index >= figure.points.length ||
           seg.point2Index >= figure.points.length) {
@@ -97,67 +103,71 @@ class FigureFramePainter extends CustomPainter {
       final opacity = _opacityAtSeg(seg);
       final overColor = _colorOverrideAtSeg(seg);
 
-      switch (seg.type) {
-        case 'line':
-          final baseColor =
-              parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
-          final paint = Paint()
-            ..color = baseColor.withValues(alpha: baseColor.a * opacity)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = seg.width <= 0 ? 3 : seg.width
-            ..strokeCap = _capFor(seg.lineCap);
-          _drawSegmentLine(canvas, paint, seg, p1, p2);
-        case 'circle':
-          var mx = (p1.x + p2.x) / 2;
-          var my = (p1.y + p2.y) / 2;
-          if (seg.curved) {
-            final cpx = seg.controlDX != null
-                ? mx + seg.controlDX!
-                : mx + (-(p2.y - p1.y) * seg.curvature);
-            final cpy = seg.controlDY != null
-                ? my + seg.controlDY!
-                : my + ((p2.x - p1.x) * seg.curvature);
-            mx = (p1.x + p2.x) / 4 + cpx / 2;
-            my = (p1.y + p2.y) / 4 + cpy / 2;
-          }
-          final r = math.max(
-            math.sqrt((p2.x - p1.x) * (p2.x - p1.x) +
-                    (p2.y - p1.y) * (p2.y - p1.y)) /
-                2,
-            1.0,
-          );
-          if (seg.filled) {
-            final baseColor = parseHexColor(overColor) ??
-                parseHexColor(seg.fillColor) ??
-                parseHexColor(seg.color) ??
+      groups.add(opacity, () {
+        // Everything inside an opacity layer is opaque. The bucket's layer
+        // applies the alpha once when it is composited back onto the canvas.
+        switch (seg.type) {
+          case 'line':
+            final baseColor = parseHexColor(overColor ?? style.color) ??
+                const Color(0xFFD1D5DB);
+            final paint = Paint()
+              ..color = baseColor
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = style.width <= 0 ? 3 : style.width
+              ..strokeCap = _capFor(style.lineCap);
+            _drawSegmentLine(canvas, paint, seg, p1, p2, style);
+          case 'circle':
+            var mx = (p1.x + p2.x) / 2;
+            var my = (p1.y + p2.y) / 2;
+            if (style.curved) {
+              final cpx = style.controlDX != null
+                  ? mx + style.controlDX!
+                  : mx + (-(p2.y - p1.y) * style.curvature);
+              final cpy = style.controlDY != null
+                  ? my + style.controlDY!
+                  : my + ((p2.x - p1.x) * style.curvature);
+              mx = (p1.x + p2.x) / 4 + cpx / 2;
+              my = (p1.y + p2.y) / 4 + cpy / 2;
+            }
+            final r = math.max(
+              math.sqrt((p2.x - p1.x) * (p2.x - p1.x) +
+                      (p2.y - p1.y) * (p2.y - p1.y)) /
+                  2,
+              1.0,
+            );
+            if (style.filled) {
+              final baseColor = parseHexColor(overColor) ??
+                  parseHexColor(style.fillColor) ??
+                  parseHexColor(style.color) ??
+                  const Color(0xFFD1D5DB);
+              canvas.drawCircle(
+                Offset(mx, my),
+                r,
+                Paint()..color = baseColor,
+              );
+            }
+            final strokeColor =
+                parseHexColor(overColor ?? style.color) ??
                 const Color(0xFFD1D5DB);
             canvas.drawCircle(
               Offset(mx, my),
               r,
-              Paint()..color = baseColor.withValues(alpha: baseColor.a * opacity),
+              Paint()
+                ..color = strokeColor
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = style.width <= 0 ? 3 : style.width,
             );
-          }
-          final strokeColor =
-              parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
-          canvas.drawCircle(
-            Offset(mx, my),
-            r,
-            Paint()
-              ..color =
-                  strokeColor.withValues(alpha: strokeColor.a * opacity)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = seg.width <= 0 ? 3 : seg.width,
-          );
-        case 'image':
-          _paintImageSegment(canvas, seg, p1, p2, opacity);
-        case 'text':
-          _paintTextSegment(canvas, seg, p1, p2, opacity, overColor);
-      }
+          case 'image':
+            _paintImageSegment(canvas, seg, p1, p2, 1.0, style);
+          case 'text':
+            _paintTextSegment(canvas, seg, style, p1, p2, 1.0, overColor);
+        }
+      });
     }
   }
 
-  void _paintImageSegment(
-      Canvas canvas, Segment seg, Point2 p1, Point2 p2, double opacity) {
+  void _paintImageSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2,
+      double opacity, SegmentFrameStyle style) {
     int imageIndex = seg.activeImageIndex;
     if (animate) {
       imageIndex =
@@ -173,23 +183,23 @@ class FigureFramePainter extends CustomPainter {
 
     double mx = (p1.x + p2.x) / 2;
     double my = (p1.y + p2.y) / 2;
-    if (seg.curved) {
-      final cpx = seg.controlDX != null
-          ? mx + seg.controlDX!
-          : mx + (-(p2.y - p1.y) * seg.curvature);
-      final cpy = seg.controlDY != null
-          ? my + seg.controlDY!
-          : my + ((p2.x - p1.x) * seg.curvature);
+    if (style.curved) {
+      final cpx = style.controlDX != null
+          ? mx + style.controlDX!
+          : mx + (-(p2.y - p1.y) * style.curvature);
+      final cpy = style.controlDY != null
+          ? my + style.controlDY!
+          : my + ((p2.x - p1.x) * style.curvature);
       mx = (p1.x + p2.x) / 4 + cpx / 2;
       my = (p1.y + p2.y) / 4 + cpy / 2;
     }
-    final ox = seg.imageOffsetX;
-    final oy = seg.imageOffsetY;
+    final ox = style.imageOffsetX;
+    final oy = style.imageOffsetY;
     final segAngle = math.atan2(p2.y - p1.y, p2.x - p1.x);
-    final rotate = segAngle + seg.imageRotate * math.pi / 180;
+    final rotate = segAngle + style.imageRotate * math.pi / 180;
     final cx = mx + ox;
     final cy = my + oy;
-    final size = _resolveImageSize(seg, image);
+    final size = _resolveImageSize(style, image);
     canvas.save();
     canvas.translate(cx, cy);
     canvas.rotate(rotate);
@@ -204,23 +214,23 @@ class FigureFramePainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _paintTextSegment(Canvas canvas, Segment seg, Point2 p1, Point2 p2,
-      double opacity, String? overColor) {
-    final text = seg.text;
+  void _paintTextSegment(Canvas canvas, Segment seg, SegmentFrameStyle style,
+      Point2 p1, Point2 p2, double opacity, String? overColor) {
+    final text = style.text;
     if (text == null || text.isEmpty) return;
     final mx = (p1.x + p2.x) / 2;
     final my = (p1.y + p2.y) / 2;
     final angle = math.atan2(p2.y - p1.y, p2.x - p1.x);
     final baseColor =
-        parseHexColor(overColor ?? seg.color) ?? const Color(0xFFD1D5DB);
+        parseHexColor(overColor ?? style.color) ?? const Color(0xFFD1D5DB);
     final tp = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: baseColor.withValues(alpha: baseColor.a * opacity),
-          fontSize: seg.textSize <= 0 ? 32 : seg.textSize,
+          fontSize: style.textSize <= 0 ? 32 : style.textSize,
           fontWeight: FontWeight.w600,
-          fontFamily: 'Inter',
+          fontFamily: 'Onest',
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -232,11 +242,11 @@ class FigureFramePainter extends CustomPainter {
     canvas.restore();
   }
 
-  Size _resolveImageSize(Segment seg, ui.Image image) {
-    var w = seg.imageWidth is num ? (seg.imageWidth as num).toDouble() : 100.0;
-    var h = seg.imageHeight is num ? (seg.imageHeight as num).toDouble() : 100.0;
-    final wAuto = seg.imageWidth == 'auto';
-    final hAuto = seg.imageHeight == 'auto';
+  Size _resolveImageSize(SegmentFrameStyle style, ui.Image image) {
+    var w = style.imageWidth is num ? (style.imageWidth as num).toDouble() : 100.0;
+    var h = style.imageHeight is num ? (style.imageHeight as num).toDouble() : 100.0;
+    final wAuto = style.imageWidth == 'auto';
+    final hAuto = style.imageHeight == 'auto';
     final ar = image.width / image.height;
     if (wAuto && hAuto) {
       w = 100;
@@ -249,18 +259,18 @@ class FigureFramePainter extends CustomPainter {
     return Size(w, h);
   }
 
-  void _drawSegmentLine(
-      Canvas canvas, Paint paint, Segment seg, Point2 p1, Point2 p2) {
+  void _drawSegmentLine(Canvas canvas, Paint paint, Segment seg, Point2 p1,
+      Point2 p2, SegmentFrameStyle style) {
     final path = Path()..moveTo(p1.x, p1.y);
-    if (seg.curved) {
+    if (style.curved) {
       final mx = (p1.x + p2.x) / 2;
       final my = (p1.y + p2.y) / 2;
-      final cpx = seg.controlDX != null
-          ? mx + seg.controlDX!
-          : mx + (-(p2.y - p1.y) * seg.curvature);
-      final cpy = seg.controlDY != null
-          ? my + seg.controlDY!
-          : my + ((p2.x - p1.x) * seg.curvature);
+      final cpx = style.controlDX != null
+          ? mx + style.controlDX!
+          : mx + (-(p2.y - p1.y) * style.curvature);
+      final cpy = style.controlDY != null
+          ? my + style.controlDY!
+          : my + ((p2.x - p1.x) * style.curvature);
       path.quadraticBezierTo(cpx, cpy, p2.x, p2.y);
     } else {
       path.lineTo(p2.x, p2.y);
@@ -283,7 +293,7 @@ class FigureFramePainter extends CustomPainter {
   // Cycle fills (adapted 1:1 from the editor painter)
   // -------------------------------------------------------------------------
 
-  void _paintCycleFills(Canvas canvas) {
+  void _paintCycleFills(Canvas canvas, OpacityPaintGroups groups) {
     final fig = figure;
     if (fig.segments.isEmpty) return;
     final adj = <int, List<int>>{};
@@ -291,7 +301,7 @@ class FigureFramePainter extends CustomPainter {
       adj[i] = [];
     }
     for (final s in fig.segments) {
-      if (s.hidden || s.isNone) continue;
+      if (fig.styleFor(s, time, enabled: animate).hidden || s.isNone) continue;
       if (s.point1Index >= 0 &&
           s.point1Index < fig.points.length &&
           s.point2Index >= 0 &&
@@ -364,9 +374,13 @@ class FigureFramePainter extends CustomPainter {
             );
           }
           final entry = cf[key]!;
-          if (entry.filled) {
-            final fillColor = _cycleFillColor(ordered.first, entry);
-            canvas.drawPath(_cyclePath(pts), Paint()..color = fillColor);
+          final filled = figure.frameBool('cycle:$key:filled', time, entry.filled);
+          if (filled) {
+            final fillColor = _cycleFillColor(key, ordered.first, entry);
+            final path = _cyclePath(pts);
+            groups.add(_opacityAtPoint(ordered.first), () {
+              canvas.drawPath(path, Paint()..color = fillColor);
+            });
           }
         }
         continue;
@@ -404,12 +418,14 @@ class FigureFramePainter extends CustomPainter {
                   cf[key] = CycleFill(filled: true, fillColor: null);
                 }
                 final entry = cf[key]!;
-                if (entry.filled) {
-                  final fillColor = _cycleFillColor(seed, entry);
-                  canvas.drawPath(
-                    _cyclePath([...cur.path, seed]),
-                    Paint()..color = fillColor,
-                  );
+                final filled =
+                    figure.frameBool('cycle:$key:filled', time, entry.filled);
+                if (filled) {
+                  final fillColor = _cycleFillColor(key, seed, entry);
+                  final path = _cyclePath([...cur.path, seed]);
+                  groups.add(_opacityAtPoint(seed), () {
+                    canvas.drawPath(path, Paint()..color = fillColor);
+                  });
                 }
               }
               continue;
@@ -423,12 +439,16 @@ class FigureFramePainter extends CustomPainter {
     }
   }
 
-  Color _cycleFillColor(int point, CycleFill entry) {
+  Color _cycleFillColor(String key, int point, CycleFill entry) {
     final overColor = animate
         ? figure.getFigureColorOverride(figure.figureKeyFor(point), time)
         : null;
+    final cycleColor = animate
+        ? figure.frameNullableString(
+            'cycle:$key:fillColor', time, entry.fillColor)
+        : entry.fillColor;
     return parseHexColor(overColor) ??
-        parseHexColor(entry.fillColor) ??
+        parseHexColor(cycleColor) ??
         const Color(0xFFD1D5DB);
   }
 
@@ -439,15 +459,18 @@ class FigureFramePainter extends CustomPainter {
     for (var j = 0; j < pts.length; j++) {
       final next = (j + 1) % pts.length;
       final seg = _segmentBetween(pts[j], pts[next]);
-      if (seg != null &&
-          seg.curved &&
-          seg.controlDX != null &&
-          seg.controlDY != null) {
+      final style = seg == null
+          ? null
+          : figure.styleFor(seg, time, enabled: animate);
+      if (style != null &&
+          style.curved &&
+          style.controlDX != null &&
+          style.controlDY != null) {
         final mx = (figure.points[pts[j]].x + figure.points[pts[next]].x) / 2;
         final my = (figure.points[pts[j]].y + figure.points[pts[next]].y) / 2;
         path.quadraticBezierTo(
-          mx + seg.controlDX!,
-          my + seg.controlDY!,
+          mx + style.controlDX!,
+          my + style.controlDY!,
           figure.points[pts[next]].x,
           figure.points[pts[next]].y,
         );
@@ -482,6 +505,13 @@ class FigureFramePainter extends CustomPainter {
 
   double _opacityAtSeg(Segment seg) {
     final k = figure.segmentFigureKey(seg);
+    if (k < 0) return 1.0;
+    return figure.getFigureOpacity(k, time);
+  }
+
+  double _opacityAtPoint(int point) {
+    if (!animate) return 1.0;
+    final k = figure.figureKeyFor(point);
     if (k < 0) return 1.0;
     return figure.getFigureOpacity(k, time);
   }
