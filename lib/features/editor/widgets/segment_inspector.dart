@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/models/figure.dart';
 import '../../../core/models/segment.dart';
@@ -68,7 +69,7 @@ class _AccordionState extends State<_Accordion> {
                     ),
                   ),
                   Icon(
-                    _open ? Icons.expand_less : Icons.expand_more,
+                    _open ? LucideIcons.chevron_up : LucideIcons.chevron_down,
                     size: 16,
                     color: palette.textSecondary,
                   ),
@@ -457,7 +458,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
               ),
               IconButton(
                 icon: Icon(
-                  style.hidden ? Icons.visibility_off : Icons.visibility,
+                  style.hidden ? LucideIcons.eye_off : LucideIcons.eye,
                   size: 16,
                   color: style.hidden ? const Color(0xFFFB923C) : palette.textSecondary,
                 ),
@@ -467,7 +468,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
               Tooltip(
                 message: 'Hapus',
                 child: IconButton(
-                icon: const Icon(Icons.delete, size: 16, color: Color(0xFFF87171)),
+                icon: const Icon(LucideIcons.delete, size: 16, color: Color(0xFFF87171)),
                 onPressed: () {
                   if (c.isAnimationProject) {
                     // Animation: a delete only hides the object from this
@@ -518,8 +519,8 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                             children: [
                               Icon(
                                 figVisibleNow
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
+                                    ? LucideIcons.eye
+                                    : LucideIcons.eye_off,
                                 size: 16,
                                 color: figVisibleNow
                                     ? const Color(0xFF22C55E)
@@ -556,7 +557,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.delete, size: 14, color: Color(0xFFF87171)),
+                          const Icon(LucideIcons.delete, size: 14, color: Color(0xFFF87171)),
                           const SizedBox(width: 8),
                           Text('Hapus Permanen dari Scene',
                               style: TextStyle(
@@ -644,7 +645,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                           color: const Color(0x4D3B82F6),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.check,
+                        child: const Icon(LucideIcons.check,
                             size: 14, color: Color(0xFF60A5FA)),
                       ),
                     ),
@@ -695,7 +696,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                           color: const Color(0x4D3B82F6),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.check,
+                        child: const Icon(LucideIcons.check,
                             size: 14, color: Color(0xFF60A5FA)),
                       ),
                     ),
@@ -719,7 +720,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.visibility_off,
+                        const Icon(LucideIcons.eye_off,
                             size: 14, color: Color(0xFF60A5FA)),
                         const SizedBox(width: 8),
                         Text('Invisible Connector',
@@ -970,7 +971,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                           color: const Color(0x4D3B82F6),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.check,
+                        child: const Icon(LucideIcons.check,
                             size: 14, color: Color(0xFF60A5FA)),
                       ),
                     ),
@@ -1010,7 +1011,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                                       fontWeight: FontWeight.bold)),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.arrow_upward,
+                              icon: const Icon(LucideIcons.arrow_up,
                                   size: 10, color: Color(0xFF60646C)),
                               visualDensity: VisualDensity.compact,
                               onPressed: () {
@@ -1032,7 +1033,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.arrow_downward,
+                              icon: const Icon(LucideIcons.arrow_down,
                                   size: 10, color: Color(0xFF60646C)),
                               visualDensity: VisualDensity.compact,
                               onPressed: () {
@@ -1285,7 +1286,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.image, size: 16, color: palette.textSecondary),
+                    Icon(LucideIcons.image, size: 16, color: palette.textSecondary),
                     const SizedBox(width: 8),
                     Text('Pilih Gambar',
                         style: TextStyle(
@@ -1316,7 +1317,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate_outlined,
+                            Icon(LucideIcons.image_plus,
                                 size: 14, color: palette.textSecondary),
                             const SizedBox(width: 6),
                             Text('Tambah Gambar',
@@ -1425,7 +1426,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                     ),
                   ),
                   child: seg.imageDataList[i].isEmpty
-                      ? const Icon(Icons.broken_image)
+                      ? const Icon(LucideIcons.image_off)
                       : Image.memory(
                           _decodeImageData(seg.imageDataList[i]),
                           fit: BoxFit.contain,
@@ -1452,7 +1453,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   Positioned(
                     right: 2,
                     top: 2,
-                    child: Icon(Icons.check_circle,
+                    child: Icon(LucideIcons.circle_check,
                         size: 14, color: const Color(0xFF3B82F6)),
                   ),
                 if (!isAnimating)
@@ -1470,7 +1471,7 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                           color: Color(0xCCEF4444),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close,
+                        child: const Icon(LucideIcons.x,
                             size: 10, color: Colors.white),
                       ),
                     ),

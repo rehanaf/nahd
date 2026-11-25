@@ -108,7 +108,7 @@ class _SortSheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   leading: Icon(
-                    active ? Icons.radio_button_checked : Icons.radio_button_off,
+                    active ? LucideIcons.circle_dot : LucideIcons.circle,
                     size: 20,
                     color: active ? const Color(0xFF3B82F6) : palette.textSecondary,
                   ),
@@ -178,7 +178,7 @@ class _NameSheetState extends State<_NameSheet> {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: Icon(Icons.close, size: 18, color: palette.textSecondary),
+                    icon: Icon(LucideIcons.x, size: 18, color: palette.textSecondary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -270,7 +270,7 @@ class _ConfirmSheet extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, size: 18, color: palette.textSecondary),
+                    icon: Icon(LucideIcons.x, size: 18, color: palette.textSecondary),
                     onPressed: () => Navigator.of(context).pop(false),
                   ),
                 ],
@@ -328,9 +328,9 @@ class _ProfileSheet extends StatelessWidget {
         (themeMode == 'device' && Theme.of(context).brightness == Brightness.dark);
 
     final themeOptions = [
-      ('light', Icons.light_mode_outlined, 'Light'),
-      ('dark', Icons.dark_mode_outlined, 'Dark'),
-      ('device', Icons.phone_iphone, 'Device'),
+      ('light', LucideIcons.sun, 'Light'),
+      ('dark', LucideIcons.moon, 'Dark'),
+      ('device', LucideIcons.smartphone, 'Device'),
     ];
 
     return Material(
@@ -360,7 +360,7 @@ class _ProfileSheet extends StatelessWidget {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: Icon(Icons.close,
+                    icon: Icon(LucideIcons.x,
                         size: 18, color: palette.textSecondary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -504,7 +504,7 @@ class _ProfileSheet extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.storage,
+                          const Icon(LucideIcons.database,
                               size: 15, color: Color(0xFFF87171)),
                           const SizedBox(width: 8),
                           Text(
@@ -536,7 +536,7 @@ class _ProfileSheet extends StatelessWidget {
                        ),
                        child: Row(
                          children: [
-                           const Icon(Icons.system_update,
+                           const Icon(LucideIcons.download,
                                size: 16, color: Color(0xFF3B82F6)),
                            const SizedBox(width: 8),
                            Text(

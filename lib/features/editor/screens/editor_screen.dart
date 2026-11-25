@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import '../../../core/widgets/color_picker_sheet.dart';
 
 import '../../../core/lottie_export.dart';
@@ -355,7 +356,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const Icon(LucideIcons.x, size: 18),
                   color: palette.textSecondary,
                   onPressed: () => Navigator.of(context).pop(),
                   visualDensity: VisualDensity.compact,
@@ -380,7 +381,7 @@ class _EditorScreenState extends State<EditorScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _drawerSegmentIcon(
-                  icon: Icons.edit,
+                  icon: LucideIcons.pencil,
                   label: 'Line',
                   color: kToolColor,
                   onTap: () {
@@ -390,7 +391,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   palette: palette,
                 ),
                 _drawerSegmentIcon(
-                  icon: Icons.panorama_fish_eye,
+                  icon: LucideIcons.circle,
                   label: 'Circle',
                   color: kToolColor,
                   onTap: () {
@@ -400,7 +401,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   palette: palette,
                 ),
                 _drawerSegmentIcon(
-                  icon: Icons.image,
+                  icon: LucideIcons.image,
                   label: 'Image',
                   color: kToolColor,
                   onTap: () => _pickAndAddImageSegment(c),
@@ -495,7 +496,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           ),
                         ),
                         leading: Icon(
-                          Icons.folder,
+                          LucideIcons.folder,
                           color: palette.textSecondary,
                           size: 18,
                         ),
@@ -533,7 +534,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           ),
                         ),
                         leading: Icon(
-                          Icons.folder_open,
+                          LucideIcons.folder_open,
                           color: palette.textSecondary,
                           size: 18,
                         ),
@@ -578,7 +579,7 @@ class _EditorScreenState extends State<EditorScreen> {
           "ID: ${meta.id.substring(0, math.min(8, meta.id.length))}...",
           style: TextStyle(color: palette.textSecondary, fontSize: 11),
         ),
-        trailing: Icon(Icons.add, color: palette.text, size: 16),
+        trailing: Icon(LucideIcons.plus, color: palette.text, size: 16),
         onTap: () {
           _handleAddFigure(meta);
           Navigator.of(context).pop();
@@ -649,7 +650,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const Icon(LucideIcons.x, size: 18),
                   color: palette.textSecondary,
                   onPressed: () => Navigator.of(context).pop(),
                   visualDensity: VisualDensity.compact,
@@ -728,7 +729,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           onTap: widget.onBack,
                           borderRadius: BorderRadius.circular(16),
                           child: Icon(
-                            Icons.arrow_back,
+                            LucideIcons.arrow_left,
                             size: 18,
                             color: palette.text,
                           ),
@@ -741,13 +742,13 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: Row(
                         children: [
                           EditorIconButton(
-                            icon: Icons.undo,
+                            icon: LucideIcons.undo,
                             disabled: !c.canUndo,
                             onTap: c.undo,
                           ),
                           const SizedBox(width: 4),
                           EditorIconButton(
-                            icon: Icons.redo,
+                            icon: LucideIcons.redo,
                             disabled: !c.canRedo,
                             onTap: c.redo,
                           ),
@@ -760,14 +761,14 @@ class _EditorScreenState extends State<EditorScreen> {
                       child: Row(
                         children: [
                           EditorIconButton(
-                            icon: Icons.create_new_folder,
+                            icon: LucideIcons.folder_plus,
                             color: kToolColor,
                             onTap: () =>
                                 _scaffoldKey.currentState?.openDrawer(),
                           ),
                           const SizedBox(width: 4),
                           EditorIconButton(
-                            icon: Icons.pan_tool,
+                            icon: LucideIcons.hand,
                             color: kToolColor,
                             active: c.panEnabled,
                             onTap: c.togglePanEnabled,
@@ -786,7 +787,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     children: [
                       // Pivot (default active).
                       EditorIconButton(
-                        icon: Icons.rotate_right,
+                        icon: LucideIcons.rotate_cw,
                         color: kToolColor,
                         active: c.activeTool == EditorTool.rotate,
                         onTap: () => c.setTool(EditorTool.rotate),
@@ -796,17 +797,17 @@ class _EditorScreenState extends State<EditorScreen> {
                       ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
-                            icon: Icons.open_with,
+                            icon: LucideIcons.move,
                             key: 'point',
                             color: kToolColor,
                           ),
                           ToolGroupSub(
-                            icon: Icons.center_focus_strong,
+                            icon: LucideIcons.focus,
                             key: 'modify',
                             color: kToolColor,
                           ),
                           ToolGroupSub(
-                            icon: Icons.timeline,
+                            icon: LucideIcons.timeline,
                             key: 'curve',
                             color: kToolColor,
                           ),
@@ -826,17 +827,17 @@ class _EditorScreenState extends State<EditorScreen> {
                       ToolGroupButton(
                         subTools: const [
                           ToolGroupSub(
-                            icon: Icons.near_me,
+                            icon: LucideIcons.navigation,
                             key: 'moveAll',
                             color: kToolColor,
                           ),
                           ToolGroupSub(
-                            icon: Icons.rotate_left,
+                            icon: LucideIcons.rotate_ccw,
                             key: 'rotateAll',
                             color: kToolColor,
                           ),
                           ToolGroupSub(
-                            icon: Icons.compress,
+                            icon: LucideIcons.minimize,
                             key: 'scaleAll',
                             color: kToolColor,
                           ),
@@ -868,21 +869,21 @@ class _EditorScreenState extends State<EditorScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             EditorIconButton(
-                              icon: Icons.accessibility_new,
+                              icon: LucideIcons.accessibility,
                               color: kToolColor,
                               active: c.rigMode == RigMode.rig,
                               onTap: () => c.setRigMode(RigMode.rig),
                             ),
                             const SizedBox(width: 4),
                             EditorIconButton(
-                              icon: Icons.crop_rotate,
+                              icon: LucideIcons.crop,
                               color: kToolColor,
                               active: c.rigMode == RigMode.asset,
                               onTap: () => c.setRigMode(RigMode.asset),
                             ),
                             const SizedBox(width: 4),
                             EditorIconButton(
-                              icon: Icons.anchor,
+                              icon: LucideIcons.anchor,
                               color: kToolColor,
                               active: c.rigMode == RigMode.anchor,
                               onTap: () => c.setRigMode(RigMode.anchor),
@@ -900,7 +901,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           onTap: () => setState(() => _showMenu = !_showMenu),
                           borderRadius: BorderRadius.circular(16),
                           child: Icon(
-                            Icons.more_horiz,
+                            LucideIcons.ellipsis,
                             size: 18,
                             color: palette.text,
                           ),
@@ -930,7 +931,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Permanent Delete',
                             child: EditorIconButton(
-                              icon: Icons.delete_forever,
+                              icon: LucideIcons.trash,
                               color: kToolColor,
                               disabled:
                                   c.selectedPointIndex == null &&
@@ -961,7 +962,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Attach Figure',
                             child: EditorIconButton(
-                              icon: Icons.link,
+                              icon: LucideIcons.link,
                               color: kToolColor,
                               active: c.activeTool == EditorTool.attach,
                               onTap: () {
@@ -987,7 +988,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Center Figure',
                             child: EditorIconButton(
-                              icon: Icons.filter_center_focus,
+                              icon: LucideIcons.focus,
                               color: kToolColor,
                               disabled:
                                   c.selectedPointIndex == null &&
@@ -1009,7 +1010,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Toggle Visibility',
                             child: EditorIconButton(
-                              icon: Icons.visibility,
+                              icon: LucideIcons.eye,
                               color: kToolColor,
                               disabled:
                                   c.selectedPointIndex == null &&
@@ -1025,7 +1026,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Opacity',
                             child: EditorIconButton(
-                              icon: Icons.opacity,
+                              icon: LucideIcons.droplet,
                               color: kToolColor,
                               disabled:
                                   c.selectedPointIndex == null &&
@@ -1100,7 +1101,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                           : 'Collision: OFF (tap to enable)')
                                     : 'Collision (select a figure)',
                                 child: EditorIconButton(
-                                  icon: Icons.shield_outlined,
+                                  icon: LucideIcons.shield,
                                   color: kToolColor,
                                   active: isCol,
                                   disabled: !hasSelection,
@@ -1122,7 +1123,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                     ? 'Replace Image Asset'
                                     : 'Replace Image (select an image segment)',
                                 child: EditorIconButton(
-                                  icon: Icons.image_search,
+                                  icon: LucideIcons.image,
                                   color: kToolColor,
                                   disabled: !isImg,
                                   onTap: isImg
@@ -1176,7 +1177,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                     ? 'Sprite Frame (tap to cycle)'
                                     : 'Sprite Frame (select an image segment)',
                                 child: EditorIconButton(
-                                  icon: Icons.photo_library,
+                                  icon: LucideIcons.images,
                                   color: kToolColor,
                                   disabled: !isSpriteImage,
                                   onTap: isSpriteImage
@@ -1211,7 +1212,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Copy Pose',
                             child: EditorIconButton(
-                              icon: Icons.copy,
+                              icon: LucideIcons.copy,
                               color: kToolColor,
                               onTap: () {
                                 c.copyFrame(c.currentTime);
@@ -1231,7 +1232,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           Tooltip(
                             message: 'Paste Pose',
                             child: EditorIconButton(
-                              icon: Icons.paste,
+                              icon: LucideIcons.clipboard_paste,
                               color: kToolColor,
                               disabled: !c.hasCopiedFrame,
                               onTap: () {
@@ -1267,7 +1268,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             Tooltip(
                               message: 'Draw Tools',
                               child: EditorIconButton(
-                                icon: Icons.edit,
+                                icon: LucideIcons.pencil,
                                 color: kToolColor,
                                 active: _sideTab == 0,
                                 onTap: () => setState(() => _sideTab = 0),
@@ -1278,7 +1279,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             Tooltip(
                               message: 'Type Tools',
                               child: EditorIconButton(
-                                icon: Icons.category,
+                                icon: LucideIcons.layout_grid,
                                 color: kToolColor,
                                 active: _sideTab == 1,
                                 onTap: () => setState(() => _sideTab = 1),
@@ -1289,7 +1290,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             Tooltip(
                               message: 'Linejoin Tools',
                               child: EditorIconButton(
-                                icon: Icons.line_style,
+                                icon: LucideIcons.pen_tool,
                                 color: kToolColor,
                                 active: _sideTab == 2,
                                 onTap: () => setState(() => _sideTab = 2),
@@ -1300,7 +1301,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             Tooltip(
                               message: 'Appearance',
                               child: EditorIconButton(
-                                icon: Icons.palette,
+                                icon: LucideIcons.palette,
                                 color: kToolColor,
                                 active: _sideTab == 3,
                                 onTap: () => setState(() => _sideTab = 3),
@@ -1311,7 +1312,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             Tooltip(
                               message: 'Segment Tools',
                               child: EditorIconButton(
-                                icon: Icons.layers,
+                                icon: LucideIcons.layers,
                                 color: kToolColor,
                                 active: _sideTab == 4,
                                 onTap: () => setState(() => _sideTab = 4),
@@ -1339,7 +1340,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Line Tool',
                                     child: EditorIconButton(
-                                      icon: Icons.edit,
+                                      icon: LucideIcons.pencil,
                                       color: kToolColor,
                                       active: activeTool == EditorTool.line,
                                       onTap: () {
@@ -1352,7 +1353,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Circle Tool',
                                     child: EditorIconButton(
-                                      icon: Icons.panorama_fish_eye,
+                                      icon: LucideIcons.circle,
                                       color: kToolColor,
                                       active: activeTool == EditorTool.circle,
                                       onTap: () {
@@ -1365,7 +1366,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Image Tool',
                                     child: EditorIconButton(
-                                      icon: Icons.image,
+                                      icon: LucideIcons.image,
                                       color: kToolColor,
                                       active: activeTool == EditorTool.image,
                                       onTap: () {
@@ -1378,7 +1379,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Text Tool',
                                     child: EditorIconButton(
-                                      icon: Icons.text_fields,
+                                      icon: LucideIcons.type,
                                       color: kToolColor,
                                       active: activeTool == EditorTool.text,
                                       onTap: () {
@@ -1391,7 +1392,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'None Tool',
                                     child: EditorIconButton(
-                                      icon: Icons.visibility_off,
+                                      icon: LucideIcons.eye_off,
                                       color: kToolColor,
                                       active: activeTool == EditorTool.none,
                                       onTap: () {
@@ -1410,7 +1411,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Join Tool',
                                     child: EditorIconButton(
-                                      icon: Icons.join_inner,
+                                      icon: LucideIcons.git_commit_vertical,
                                       color: kToolColor,
                                       active: activeTool == EditorTool.join,
                                       onTap: () {
@@ -1430,7 +1431,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Type: Line',
                                     child: EditorIconButton(
-                                      icon: Icons.edit,
+                                      icon: LucideIcons.pencil,
                                       color: kToolColor,
                                       active: segType == 'line',
                                       disabled: seg == null,
@@ -1449,7 +1450,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Type: Circle',
                                     child: EditorIconButton(
-                                      icon: Icons.panorama_fish_eye,
+                                      icon: LucideIcons.circle,
                                       color: kToolColor,
                                       active: segType == 'circle',
                                       disabled: seg == null,
@@ -1468,7 +1469,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Type: Image',
                                     child: EditorIconButton(
-                                      icon: Icons.image,
+                                      icon: LucideIcons.image,
                                       color: kToolColor,
                                       active: segType == 'image',
                                       disabled: seg == null,
@@ -1487,7 +1488,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Type: Text',
                                     child: EditorIconButton(
-                                      icon: Icons.text_fields,
+                                      icon: LucideIcons.type,
                                       color: kToolColor,
                                       active: segType == 'text',
                                       disabled: seg == null,
@@ -1506,7 +1507,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Type: None',
                                     child: EditorIconButton(
-                                      icon: Icons.visibility_off,
+                                      icon: LucideIcons.eye_off,
                                       color: kToolColor,
                                       active: segType == 'none',
                                       disabled: seg == null,
@@ -1532,7 +1533,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Round',
                                     child: EditorIconButton(
-                                      icon: Icons.circle_outlined,
+                                      icon: LucideIcons.circle,
                                       color: kToolColor,
                                       active: cap == 'round',
                                       disabled: seg == null,
@@ -1548,7 +1549,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Square',
                                     child: EditorIconButton(
-                                      icon: Icons.square_outlined,
+                                      icon: LucideIcons.square,
                                       color: kToolColor,
                                       active: cap == 'square',
                                       disabled: seg == null,
@@ -1564,7 +1565,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Butt',
                                     child: EditorIconButton(
-                                      icon: Icons.remove,
+                                      icon: LucideIcons.minus,
                                       color: kToolColor,
                                       active: cap == 'butt',
                                       disabled: seg == null,
@@ -1603,7 +1604,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                     Tooltip(
                                       message: 'Replace Image',
                                       child: EditorIconButton(
-                                        icon: Icons.image_search,
+                                        icon: LucideIcons.image,
                                         color: kToolColor,
                                         onTap: () async {
                                           try {
@@ -1759,8 +1760,8 @@ class _EditorScreenState extends State<EditorScreen> {
                                       icon:
                                           c.pointModes[c.selectedPointIndex] ==
                                               'static'
-                                          ? Icons.lock
-                                          : Icons.lock_open,
+                                          ? LucideIcons.lock
+                                          : LucideIcons.lock_open,
                                       color: kToolColor,
                                       active:
                                           c.pointModes[c.selectedPointIndex] ==
@@ -1776,20 +1777,20 @@ class _EditorScreenState extends State<EditorScreen> {
                                   Tooltip(
                                     message: 'Flip',
                                     child: EditorIconButton(
-                                      icon: Icons.swap_horiz,
+                                      icon: LucideIcons.arrow_left_right,
                                       disabled: !canFlip,
                                       onTap: _handleFlip,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   EditorIconButton(
-                                    icon: Icons.keyboard_arrow_up,
+                                    icon: LucideIcons.chevron_up,
                                     disabled: !canFlip,
                                     onTap: _layerUp,
                                   ),
                                   const SizedBox(height: 4),
                                   EditorIconButton(
-                                    icon: Icons.keyboard_arrow_down,
+                                    icon: LucideIcons.chevron_down,
                                     disabled: !canFlip,
                                     onTap: _layerDown,
                                   ),
@@ -1798,7 +1799,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                     Tooltip(
                                       message: 'Edit Text',
                                       child: EditorIconButton(
-                                        icon: Icons.edit_note,
+                                        icon: LucideIcons.file_pen,
                                         color: kToolColor,
                                         onTap: () => _editTextSegment(c, seg),
                                       ),
@@ -1825,7 +1826,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 children: [
                   if (c.isAnimateMode)
                     EditorIconButton(
-                      icon: Icons.grid_view_outlined,
+                      icon: LucideIcons.layout_grid,
                       color: kToolColor,
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
@@ -1835,25 +1836,25 @@ class _EditorScreenState extends State<EditorScreen> {
                     ),
                   if (c.isAnimateMode)
                     EditorIconButton(
-                      icon: Icons.settings,
+                      icon: LucideIcons.settings,
                       color: kToolColor,
                       active: _rightTab == _RightTab.settings,
                       onTap: () => _openRightTab(_RightTab.settings),
                     ),
                   EditorIconButton(
-                    icon: Icons.tune,
+                    icon: LucideIcons.sliders_horizontal,
                     color: kToolColor,
                     active: _rightTab == _RightTab.inspector,
                     onTap: () => _openRightTab(_RightTab.inspector),
                   ),
                   EditorIconButton(
-                    icon: Icons.layers,
+                    icon: LucideIcons.layers,
                     color: kToolColor,
                     active: _rightTab == _RightTab.layers,
                     onTap: () => _openRightTab(_RightTab.layers),
                   ),
                   EditorIconButton(
-                    icon: Icons.delete,
+                    icon: LucideIcons.delete,
                     color: kToolColor,
                     onTap: _handleReset,
                   ),
@@ -1880,7 +1881,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _MenuItem(
-                          icon: Icons.upload_file,
+                          icon: LucideIcons.upload,
                           label: 'Import SVG',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1890,7 +1891,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.image,
+                          icon: LucideIcons.image,
                           label: 'Import SVG as Image',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1900,7 +1901,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.face,
+                          icon: LucideIcons.user,
                           label: 'Import Minecraft Skin',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1912,7 +1913,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: c.showConnectors ? Icons.link : Icons.link_off,
+                          icon: c.showConnectors ? LucideIcons.link : LucideIcons.link_2_off,
                           label: c.showConnectors
                               ? 'Hide Connectors'
                               : 'Show Connectors',
@@ -1922,7 +1923,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: c.showAxis ? Icons.grid_off : Icons.grid_on,
+                          icon: c.showAxis ? LucideIcons.grid_3x3 : LucideIcons.grid_3x3,
                           label: c.showAxis
                               ? 'Hide Grid Axis'
                               : 'Show Grid Axis',
@@ -1932,7 +1933,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: c.snapEnabled ? Icons.grid_on : Icons.grid_off,
+                          icon: c.snapEnabled ? LucideIcons.grid_3x3 : LucideIcons.grid_3x3,
                           label: c.snapEnabled ? 'Snap: On' : 'Snap: Off',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1941,7 +1942,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.play_circle_outline,
+                          icon: LucideIcons.circle_play,
                           label: 'Preview',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1949,7 +1950,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.gif_box_outlined,
+                          icon: LucideIcons.file_image,
                           label: 'Export GIF',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1957,7 +1958,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.burst_mode,
+                          icon: LucideIcons.images,
                           label: 'Export PNG Frames',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1968,7 +1969,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         // Presets/Figures are reusable assets and keep Lottie.
                         if (!c.isAnimationProject)
                           _MenuItem(
-                            icon: Icons.animation,
+                            icon: LucideIcons.film,
                             label: 'Export Lottie',
                             onTap: () {
                               setState(() => _showMenu = false);
@@ -1976,7 +1977,7 @@ class _EditorScreenState extends State<EditorScreen> {
                             },
                           ),
                         _MenuItem(
-                          icon: Icons.collections_bookmark,
+                          icon: LucideIcons.bookmark,
                           label: 'Poses',
                           onTap: () {
                             setState(() => _showMenu = false);
@@ -1984,7 +1985,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.add,
+                          icon: LucideIcons.plus,
                           label: 'Zoom In',
                           onTap: () {
                             c.zoomIn();
@@ -1992,7 +1993,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.remove,
+                          icon: LucideIcons.minus,
                           label: 'Zoom Out',
                           onTap: () {
                             c.zoomOut();
@@ -2000,7 +2001,7 @@ class _EditorScreenState extends State<EditorScreen> {
                           },
                         ),
                         _MenuItem(
-                          icon: Icons.fullscreen,
+                          icon: LucideIcons.maximize,
                           label: 'Reset Zoom',
                           onTap: () {
                             c.zoomReset();

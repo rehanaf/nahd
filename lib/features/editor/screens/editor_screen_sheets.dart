@@ -189,7 +189,7 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: _saveCurrent,
-            icon: const Icon(Icons.save_outlined, size: 16),
+            icon: const Icon(LucideIcons.save, size: 16),
             label: const Text('Save current pose'),
           ),
           const SizedBox(height: 12),
@@ -209,7 +209,7 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
                       return ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.accessibility_new),
+                        leading: const Icon(LucideIcons.accessibility),
                         title: Text(
                           pose.name,
                           style: const TextStyle(fontSize: 13),
@@ -222,11 +222,11 @@ class _PoseLibrarySheetState extends State<PoseLibrarySheet> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit_outlined, size: 16),
+                              icon: const Icon(LucideIcons.pencil, size: 16),
                               onPressed: () => _rename(pose),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 16),
+                              icon: const Icon(LucideIcons.trash, size: 16),
                               onPressed: () => _delete(pose),
                             ),
                           ],

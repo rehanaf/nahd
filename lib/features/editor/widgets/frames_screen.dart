@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/models/figure.dart';
 import '../controllers/editor_controller.dart';
@@ -110,7 +111,7 @@ class _FramesScreenState extends State<FramesScreen> {
         foregroundColor: palette.text,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(LucideIcons.arrow_left),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -193,11 +194,11 @@ class _FrameMenuSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = Theme.of(context).appColors;
     final items = [
-      ('copy', Icons.copy_outlined, 'Copy Frame', palette.text, true),
-      ('paste', Icons.content_paste, 'Paste Frame', palette.text, hasCopied),
+      ('copy', LucideIcons.copy, 'Copy Frame', palette.text, true),
+      ('paste', LucideIcons.clipboard_paste, 'Paste Frame', palette.text, hasCopied),
       (
         'delete',
-        Icons.delete_outline,
+        LucideIcons.trash,
         'Delete Frame',
         const Color(0xFFF87171),
         true,

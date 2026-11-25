@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/models/figure.dart';
 import '../../../core/models/segment.dart';
@@ -172,7 +173,7 @@ class _LayerPanelState extends State<LayerPanel> {
               ),
               if (!readOnly)
                 IconButton(
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const Icon(LucideIcons.plus, size: 18),
                   color: palette.textSecondary,
                   visualDensity: VisualDensity.compact,
                   onPressed: () => c.addLayerGroup(),
@@ -331,7 +332,7 @@ class _GroupHeaderRow extends StatelessWidget {
               index: index,
               child: const Padding(
                 padding: EdgeInsets.all(3),
-                child: Icon(Icons.drag_indicator, size: 16),
+                child: Icon(LucideIcons.grip_vertical, size: 16),
               ),
             ),
           if (!readOnly) const SizedBox(width: 2),
@@ -340,13 +341,13 @@ class _GroupHeaderRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(2),
               child: Icon(
-                expanded ? Icons.expand_more : Icons.chevron_right,
+                expanded ? LucideIcons.chevron_down : LucideIcons.chevron_right,
                 size: 16,
                 color: palette.textSecondary,
               ),
             ),
           ),
-          Icon(Icons.folder,
+          Icon(LucideIcons.folder,
               size: 16,
               color:
                   isDefault ? palette.textSecondary : const Color(0xFF0D9488)),
@@ -376,25 +377,25 @@ class _GroupHeaderRow extends StatelessWidget {
           ),
           if (!readOnly) ...[
             _IconBtn(
-              icon: group.visible ? Icons.visibility : Icons.visibility_off,
+              icon: group.visible ? LucideIcons.eye : LucideIcons.eye_off,
               active: group.visible,
               onTap: onVisible,
             ),
             _IconBtn(
-              icon: group.locked ? Icons.lock : Icons.lock_open,
+              icon: group.locked ? LucideIcons.lock : LucideIcons.lock_open,
               active: group.locked,
               color: group.locked ? const Color(0xFF2563EB) : null,
               onTap: onLock,
             ),
             if (!isDefault)
               _IconBtn(
-                icon: Icons.edit_outlined,
+                icon: LucideIcons.pencil,
                 color: palette.textSecondary,
                 onTap: onRename,
               ),
             if (!isDefault)
               _IconBtn(
-                icon: Icons.delete_outline,
+                icon: LucideIcons.trash,
                 color: palette.textSecondary,
                 onTap: onRemove,
               ),
@@ -430,10 +431,10 @@ class _SegmentDragRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon) = switch (seg.type) {
-      'circle' => ('Circle', Icons.circle_outlined),
-      'image' => ('Image', Icons.image_outlined),
-      'none' => ('Link', Icons.link),
-      _ => ('Line', Icons.show_chart),
+      'circle' => ('Circle', LucideIcons.circle),
+      'image' => ('Image', LucideIcons.image),
+      'none' => ('Link', LucideIcons.link),
+      _ => ('Line', LucideIcons.trending_up),
     };
     return InkWell(
       onTap: onTap,
@@ -454,7 +455,7 @@ class _SegmentDragRow extends StatelessWidget {
                 index: index,
                 child: Padding(
                   padding: const EdgeInsets.all(2),
-                  child: Icon(Icons.drag_indicator,
+                  child: Icon(LucideIcons.grip_vertical,
                       size: 14, color: palette.textSecondary),
                 ),
               ),
@@ -481,7 +482,7 @@ class _SegmentDragRow extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Icon(
-                    seg.hidden ? Icons.visibility_off : Icons.visibility,
+                    seg.hidden ? LucideIcons.eye_off : LucideIcons.eye,
                     size: 14,
                     color: palette.textSecondary,
                   ),

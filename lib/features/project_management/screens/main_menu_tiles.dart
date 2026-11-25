@@ -85,7 +85,7 @@ class _ProjectCardTileState extends State<_ProjectCardTile> {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.more_vert,
+                    LucideIcons.ellipsis_vertical,
                     size: 16,
                     color: Colors.white,
                   ),
@@ -198,7 +198,7 @@ class _GroupCardTileState extends State<_GroupCardTile> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.folder_outlined,
+                                LucideIcons.folder,
                                 size: 26,
                                 color: palette.textSecondary,
                               ),
@@ -246,7 +246,7 @@ class _GroupCardTileState extends State<_GroupCardTile> {
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.more_vert,
+                      LucideIcons.ellipsis_vertical,
                       size: 16,
                       color: Colors.white,
                     ),

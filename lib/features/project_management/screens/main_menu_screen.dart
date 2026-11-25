@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/app_version.dart';
 import '../../../core/project_io.dart';
@@ -178,10 +179,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       isScrollControlled: true,
       builder: (sheetContext) => _MenuSheet(
         options: const [
-          _MenuOption('rename', Icons.edit_outlined, 'Rename'),
-          _MenuOption('copy', Icons.copy_outlined, 'Copy'),
-          _MenuOption('export', Icons.archive_outlined, 'Export'),
-          _MenuOption('delete', Icons.delete_outline, 'Delete', Color(0xFFF87171)),
+          _MenuOption('rename', LucideIcons.pencil, 'Rename'),
+          _MenuOption('copy', LucideIcons.copy, 'Copy'),
+          _MenuOption('export', LucideIcons.archive, 'Export'),
+          _MenuOption('delete', LucideIcons.trash, 'Delete', Color(0xFFF87171)),
         ],
         onSelected: (v) => Navigator.of(sheetContext).pop(v),
       ),
@@ -296,8 +297,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       isScrollControlled: true,
       builder: (sheetContext) => _MenuSheet(
         options: const [
-          _MenuOption('rename', Icons.edit_outlined, 'Rename'),
-          _MenuOption('delete', Icons.delete_outline, 'Delete', Color(0xFFF87171)),
+          _MenuOption('rename', LucideIcons.pencil, 'Rename'),
+          _MenuOption('delete', LucideIcons.trash, 'Delete', Color(0xFFF87171)),
         ],
         onSelected: (v) => Navigator.of(sheetContext).pop(v),
       ),
@@ -392,7 +393,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _fabPress,
         backgroundColor: const Color(0xFF2563EB),
-        child: const Icon(Icons.add, color: Colors.white, size: 26),
+        child: const Icon(LucideIcons.plus, color: Colors.white, size: 26),
       ),
     );
   }
@@ -436,7 +437,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.all(6),
-              child: Icon(Icons.archive_outlined,
+              child: Icon(LucideIcons.archive,
                   size: 20, color: palette.text),
             ),
           ),
@@ -472,11 +473,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _tabButton(palette, ProjectType.animation, Icons.movie, 'Animation'),
+          _tabButton(palette, ProjectType.animation, LucideIcons.film, 'Animation'),
           const SizedBox(width: 8),
-          _tabButton(palette, ProjectType.preset, Icons.person_pin, 'Preset'),
+          _tabButton(palette, ProjectType.preset, LucideIcons.user_check, 'Preset'),
           const SizedBox(width: 8),
-          _tabButton(palette, ProjectType.figure, Icons.category, 'Figure'),
+          _tabButton(palette, ProjectType.figure, LucideIcons.layout_grid, 'Figure'),
           const Spacer(),
           _sortButton(palette),
           const SizedBox(width: 8),
@@ -497,7 +498,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: palette.backgroundSelected),
         ),
-        child: Icon(Icons.sort, size: 16, color: palette.text),
+        child: Icon(LucideIcons.arrow_down_up, size: 16, color: palette.text),
       ),
     );
   }
@@ -515,7 +516,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.create_new_folder_outlined,
+            Icon(LucideIcons.folder_plus,
                 size: 15, color: palette.textSecondary),
             const SizedBox(width: 6),
             Text(
@@ -572,7 +573,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.collections_bookmark_outlined,
+            Icon(LucideIcons.bookmark,
                 size: 40, color: palette.textSecondary),
             const SizedBox(height: 8),
             Text('Nothing here yet.',
@@ -653,7 +654,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           child: Row(
             children: [
               IconButton(
-                icon: Icon(Icons.chevron_left, size: 22, color: palette.text),
+                icon: Icon(LucideIcons.chevron_left, size: 22, color: palette.text),
                 onPressed: () => setState(() => _activeGroup = null),
               ),
               Expanded(
@@ -677,7 +678,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               ),
               if (g.kind == 'user')
                 IconButton(
-                  icon: const Icon(Icons.delete, size: 18, color: Color(0xFFF87171)),
+                  icon: const Icon(LucideIcons.delete, size: 18, color: Color(0xFFF87171)),
                   onPressed: _confirmDeleteGroup,
                 ),
             ],

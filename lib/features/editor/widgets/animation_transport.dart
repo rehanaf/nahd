@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../controllers/editor_controller.dart';
 import '../../../core/theme/app_theme.dart';
@@ -58,7 +59,7 @@ class AnimationTransport extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          EditorIconButton(icon: Icons.skip_previous, onTap: goPrev),
+          EditorIconButton(icon: LucideIcons.skip_back, onTap: goPrev),
           // Fixed-size slot: keeps the transport capsule from resizing when
           // the frame number gains/loses digits (e.g. 9/10 -> 10/100).
           SizedBox(
@@ -78,7 +79,7 @@ class AnimationTransport extends StatelessWidget {
               ),
             ),
           ),
-          EditorIconButton(icon: Icons.skip_next, onTap: goNext),
+          EditorIconButton(icon: LucideIcons.skip_forward, onTap: goNext),
           Container(width: 1, height: 20, color: palette.border),
           const SizedBox(width: 2),
           Material(
@@ -93,7 +94,7 @@ class AnimationTransport extends StatelessWidget {
                 width: 32,
                 height: 32,
                 child: Icon(
-                  controller.isPlaying ? Icons.pause : Icons.play_arrow,
+                  controller.isPlaying ? LucideIcons.pause : LucideIcons.play,
                   size: 16,
                   color: Colors.white,
                 ),

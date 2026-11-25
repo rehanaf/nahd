@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 
 import '../../../core/models/segment.dart';
 import '../controllers/editor_controller.dart';
@@ -86,7 +87,7 @@ class _AnimationSettingsPanelState extends State<AnimationSettingsPanel> {
           rowBox(Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.remove, size: 14),
+                icon: const Icon(LucideIcons.minus, size: 14),
                 color: palette.textSecondary,
                 onPressed: () => _changeFps(c.fps.round() - 1),
                 visualDensity: VisualDensity.compact,
@@ -115,7 +116,7 @@ class _AnimationSettingsPanelState extends State<AnimationSettingsPanel> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.add, size: 14),
+                icon: const Icon(LucideIcons.plus, size: 14),
                 color: palette.textSecondary,
                 onPressed: () => _changeFps(c.fps.round() + 1),
                 visualDensity: VisualDensity.compact,

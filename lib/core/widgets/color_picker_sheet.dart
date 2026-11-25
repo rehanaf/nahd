@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart'
     hide colorToHex;
 
@@ -83,7 +84,7 @@ class ColorField extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.palette_outlined,
+                    Icon(LucideIcons.palette,
                         size: 14, color: palette.text),
                     const SizedBox(width: 4),
                     Text(
@@ -175,7 +176,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: Icon(Icons.close,
+                    icon: Icon(LucideIcons.x,
                         size: 18, color: palette.textSecondary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),

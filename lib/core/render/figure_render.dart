@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:image/image.dart' as img;
 
 import 'opacity_groups.dart';
@@ -736,7 +737,7 @@ class _FigurePreviewScreenState extends State<FigurePreviewScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(LucideIcons.x, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
@@ -751,7 +752,7 @@ class _FigurePreviewScreenState extends State<FigurePreviewScreen> {
                   const Spacer(),
                   IconButton(
                     icon: Icon(
-                      _playing ? Icons.pause_circle : Icons.play_circle,
+                      _playing ? LucideIcons.circle_pause : LucideIcons.circle_play,
                       color: Colors.white,
                       size: 30,
                     ),
