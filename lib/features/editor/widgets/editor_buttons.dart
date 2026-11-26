@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smooth_corner/smooth_corner.dart';
 
 import '../../../core/theme/app_theme.dart';
 
@@ -33,14 +34,13 @@ class EditorIconButton extends StatelessWidget {
     return InkWell(
       onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
+      child: SmoothContainer(
         width: 32,
         height: 32,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Icon(icon, size: size, color: iconColor),
+        smoothness: 0.6,
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        child: Center(child: Icon(icon, size: size, color: iconColor)),
       ),
     );
   }
@@ -104,13 +104,12 @@ class OverlayCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = Theme.of(context).appColors;
-    return Container(
+    return SmoothContainer(
       padding: padding,
-      decoration: BoxDecoration(
-        color: palette.background.withValues(alpha: 0.85),
-        borderRadius: borderRadius,
-        border: Border.all(color: palette.border),
-      ),
+      smoothness: 0.6,
+      color: palette.background.withValues(alpha: 0.85),
+      borderRadius: borderRadius,
+      side: BorderSide(color: palette.border),
       child: child,
     );
   }

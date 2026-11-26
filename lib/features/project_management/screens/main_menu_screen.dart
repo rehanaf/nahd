@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:smooth_corner/smooth_corner.dart';
 
 import '../../../core/app_version.dart';
 import '../../../core/project_io.dart';

@@ -569,3 +569,151 @@ class _ProfileSheet extends StatelessWidget {
     );
   }
 }
+
+class _SquircleTestSection extends StatefulWidget {
+  final AppPalette palette;
+  const _SquircleTestSection({required this.palette});
+
+  @override
+  State<_SquircleTestSection> createState() => _SquircleTestSectionState();
+}
+
+class _SquircleTestSectionState extends State<_SquircleTestSection> {
+  double _smoothness = 0.6;
+  bool _switchActive = true;
+  int _activeTab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = widget.palette;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.backgroundSelected),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.sliders_horizontal, size: 16, color: Color(0xFF3B82F6)),
+              const SizedBox(width: 8),
+              Text(
+                'Squircle Showcase & Test',
+                style: TextStyle(
+                  color: palette.text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Smoothness: ${_smoothness.toStringAsFixed(1)}',
+            style: TextStyle(color: palette.textSecondary, fontSize: 12),
+          ),
+          Slider(
+            value: _smoothness,
+            min: 0.0,
+            max: 1.0,
+            divisions: 10,
+            label: _smoothness.toStringAsFixed(1),
+            onChanged: (v) => setState(() => _smoothness = v),
+          ),
+          const SizedBox(height: 8),
+          SmoothContainer(
+            smoothness: _smoothness,
+            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFF2563EB),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(12),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Center(
+                    child: Text(
+                      'Test Button (Squircle)',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: SmoothContainer(
+                  smoothness: _smoothness,
+                  borderRadius: BorderRadius.circular(20),
+                  color: palette.backgroundElement,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(LucideIcons.sparkles, size: 14, color: Color(0xFF3B82F6)),
+                      const SizedBox(width: 6),
+                      Text('Capsule', style: TextStyle(color: palette.text, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => setState(() => _switchActive = !_switchActive),
+                child: SmoothContainer(
+                  smoothness: _smoothness,
+                  borderRadius: BorderRadius.circular(16),
+                  color: _switchActive ? const Color(0xFF2563EB) : palette.backgroundElement,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Text(
+                    _switchActive ? 'Active' : 'Off',
+                    style: TextStyle(color: _switchActive ? Colors.white : palette.textSecondary, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SmoothContainer(
+            smoothness: _smoothness,
+            borderRadius: BorderRadius.circular(12),
+            color: palette.backgroundElement,
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              children: [
+                for (int i = 0; i < 3; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _activeTab = i),
+                      child: SmoothContainer(
+                        smoothness: _smoothness,
+                        borderRadius: BorderRadius.circular(10),
+                        color: _activeTab == i ? const Color(0xFF2563EB) : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Center(
+                          child: Text(
+                            'Tab ${i + 1}',
+                            style: TextStyle(
+                              color: _activeTab == i ? Colors.white : palette.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -41,6 +41,7 @@ dependencies:
   xml: ^6.5.0
   image: 4.8.0
   flutter_lucide: ^1.79.0
+  smooth_corner: ^1.1.1
 
   # In-app update (APK luar Play Store)
   http: ^1.5.0
