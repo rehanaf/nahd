@@ -554,6 +554,8 @@ class _ProfileSheet extends StatelessWidget {
                   const SizedBox(height: 20),
                   Divider(color: palette.border, height: 1),
                   const SizedBox(height: 12),
+                  _SquircleTestSection(palette: palette),
+                  const SizedBox(height: 16),
                   Text(
                     'Version $appVersion ($appBuildNumber)',
                     textAlign: TextAlign.center,
