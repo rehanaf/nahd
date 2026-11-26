@@ -605,7 +605,7 @@ class _EditorScreenState extends State<EditorScreen> {
             height: 36,
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(10),
               child: Icon(icon, size: 20, color: color),
             ),
           ),
@@ -727,7 +727,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         height: 32,
                         child: InkWell(
                           onTap: widget.onBack,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(10),
                           child: Icon(
                             LucideIcons.arrow_left,
                             size: 18,
@@ -899,7 +899,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         height: 32,
                         child: InkWell(
                           onTap: () => setState(() => _showMenu = !_showMenu),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(10),
                           child: Icon(
                             LucideIcons.ellipsis,
                             size: 18,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:smooth_corner/smooth_corner.dart';
 
 import '../controllers/editor_controller.dart';
 import '../../../core/theme/app_theme.dart';
@@ -86,9 +87,12 @@ class AnimationTransport extends StatelessWidget {
             color: controller.isPlaying
                 ? const Color(0xFFEF4444)
                 : const Color(0xFF22C55E),
-            shape: const CircleBorder(),
+            shape: SmoothRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              smoothness: 1.0,
+            ),
+            clipBehavior: Clip.antiAlias,
             child: InkWell(
-              customBorder: const CircleBorder(),
               onTap: controller.togglePlay,
               child: SizedBox(
                 width: 32,

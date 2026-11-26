@@ -33,13 +33,13 @@ class EditorIconButton extends StatelessWidget {
             : palette.textSecondary;
     return InkWell(
       onTap: disabled ? null : onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(10),
       child: SmoothContainer(
         width: 32,
         height: 32,
-        smoothness: 0.6,
+        smoothness: 1.0,
         color: bg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         child: Center(child: Icon(icon, size: size, color: iconColor)),
       ),
     );
@@ -98,7 +98,7 @@ class OverlayCapsule extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(4),
-    this.borderRadius = const BorderRadius.all(Radius.circular(24)),
+    this.borderRadius = const BorderRadius.all(Radius.circular(12)),
   });
 
   @override
@@ -106,7 +106,7 @@ class OverlayCapsule extends StatelessWidget {
     final palette = Theme.of(context).appColors;
     return SmoothContainer(
       padding: padding,
-      smoothness: 0.6,
+      smoothness: 1.0,
       color: palette.background.withValues(alpha: 0.85),
       borderRadius: borderRadius,
       side: BorderSide(color: palette.border),
@@ -301,13 +301,12 @@ class EditorPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = Theme.of(context).appColors;
-    return Container(
+    return SmoothContainer(
       padding: padding,
-      decoration: BoxDecoration(
-        color: palette.backgroundElement,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.border),
-      ),
+      smoothness: 1.0,
+      color: palette.backgroundElement,
+      borderRadius: BorderRadius.circular(12),
+      side: BorderSide(color: palette.border),
       child: child,
     );
   }
