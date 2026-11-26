@@ -64,8 +64,8 @@ class AnimationTransport extends StatelessWidget {
           // Fixed-size slot: keeps the transport capsule from resizing when
           // the frame number gains/loses digits (e.g. 9/10 -> 10/100).
           SizedBox(
-            width: 72,
-            height: 32,
+            width: 80,
+            height: 40,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
@@ -74,14 +74,14 @@ class AnimationTransport extends StatelessWidget {
                 softWrap: false,
                 style: TextStyle(
                   color: palette.textSecondary,
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
           EditorIconButton(icon: LucideIcons.skip_forward, onTap: goNext),
-          Container(width: 1, height: 20, color: palette.border),
+          Container(width: 1, height: 24, color: palette.border),
           const SizedBox(width: 2),
           Material(
             color: controller.isPlaying
@@ -95,11 +95,11 @@ class AnimationTransport extends StatelessWidget {
             child: InkWell(
               onTap: controller.togglePlay,
               child: SizedBox(
-                width: 32,
-                height: 32,
+                width: 40,
+                height: 40,
                 child: Icon(
                   controller.isPlaying ? LucideIcons.pause : LucideIcons.play,
-                  size: 16,
+                  size: 20,
                   color: Colors.white,
                 ),
               ),

@@ -723,14 +723,14 @@ class _EditorScreenState extends State<EditorScreen> {
                     OverlayCapsule(
                       padding: const EdgeInsets.all(4),
                       child: SizedBox(
-                        width: 32,
-                        height: 32,
+                        width: 40,
+                        height: 40,
                         child: InkWell(
                           onTap: widget.onBack,
                           borderRadius: BorderRadius.circular(10),
                           child: Icon(
                             LucideIcons.arrow_left,
-                            size: 18,
+                            size: 20,
                             color: palette.text,
                           ),
                         ),
@@ -895,14 +895,14 @@ class _EditorScreenState extends State<EditorScreen> {
                     OverlayCapsule(
                       padding: const EdgeInsets.all(4),
                       child: SizedBox(
-                        width: 32,
-                        height: 32,
+                        width: 40,
+                        height: 40,
                         child: InkWell(
                           onTap: () => setState(() => _showMenu = !_showMenu),
                           borderRadius: BorderRadius.circular(10),
                           child: Icon(
                             LucideIcons.ellipsis,
-                            size: 18,
+                            size: 20,
                             color: palette.text,
                           ),
                         ),
@@ -916,13 +916,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Left sidebar — 5-tab system (Figure) or 1-capsule system (Animate/Preset)
           Positioned(
-            top: 50 + pad.top,
+            top: 56 + pad.top,
             left: 4 + pad.left,
             child: c.isAnimateMode
                 ? OverlayCapsule(
                     padding: const EdgeInsets.all(4),
                     child: SizedBox(
-                      width: 72,
+                      width: 88,
                       child: Wrap(
                         alignment: WrapAlignment.center,
                         spacing: 4,
@@ -975,12 +975,12 @@ class _EditorScreenState extends State<EditorScreen> {
                             ),
                           ),
                           SizedBox(
-                            width: 72,
+                            width: 88,
                             height: 1,
                             child: Center(
                               child: Container(
                                 height: 1,
-                                width: 48,
+                                width: 56,
                                 color: palette.border,
                               ),
                             ),
@@ -1199,12 +1199,12 @@ class _EditorScreenState extends State<EditorScreen> {
                             },
                           ),
                           SizedBox(
-                            width: 72,
+                            width: 88,
                             height: 1,
                             child: Center(
                               child: Container(
                                 height: 1,
-                                width: 48,
+                                width: 56,
                                 color: palette.border,
                               ),
                             ),
@@ -1771,7 +1771,7 @@ class _EditorScreenState extends State<EditorScreen> {
                                       ),
                                     ),
                                   ] else ...[
-                                    const SizedBox(width: 32, height: 32),
+                                    const SizedBox(width: 40, height: 40),
                                   ],
                                   const SizedBox(height: 4),
                                   Tooltip(
@@ -1817,7 +1817,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
           // Right sidebar.
           Positioned(
-            top: 50 + pad.top,
+            top: 56 + pad.top,
             right: 4 + pad.right,
             child: OverlayCapsule(
               padding: const EdgeInsets.all(4),
@@ -1866,13 +1866,13 @@ class _EditorScreenState extends State<EditorScreen> {
           // Zoom menu dropdown.
           if (_showMenu)
             Positioned(
-              top: 50 + pad.top,
+              top: 56 + pad.top,
               right: 4 + pad.right,
               child: ConstrainedBox(
                 // Cap the height so long menus scroll instead of overflowing
                 // the screen.
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height - pad.top - 50,
+                  maxHeight: MediaQuery.of(context).size.height - pad.top - 56,
                 ),
                 child: EditorPanel(
                   padding: const EdgeInsets.symmetric(vertical: 4),

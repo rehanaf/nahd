@@ -19,7 +19,7 @@ class EditorIconButton extends StatelessWidget {
     this.color,
     this.disabled = false,
     this.onTap,
-    this.size = 16,
+    this.size = 20,
   });
 
   @override
@@ -35,8 +35,8 @@ class EditorIconButton extends StatelessWidget {
       onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(10),
       child: SmoothContainer(
-        width: 32,
-        height: 32,
+        width: 40,
+        height: 40,
         smoothness: 1.0,
         color: bg,
         borderRadius: BorderRadius.circular(10),
