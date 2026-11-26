@@ -585,6 +585,8 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
   bool _switchActive = true;
   int _activeTab = 0;
 
+  static const _values = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
@@ -600,7 +602,8 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
         children: [
           Row(
             children: [
-              const Icon(LucideIcons.sliders_horizontal, size: 16, color: Color(0xFF3B82F6)),
+              const Icon(LucideIcons.sliders_horizontal,
+                  size: 16, color: Color(0xFF3B82F6)),
               const SizedBox(width: 8),
               Text(
                 'Squircle Showcase & Test',
@@ -611,6 +614,47 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: _values.map((v) {
+              final selected = (v - _smoothness).abs() < 0.001;
+              return GestureDetector(
+                onTap: () => setState(() => _smoothness = v),
+                child: Column(
+                  children: [
+                    SmoothContainer(
+                      width: 42,
+                      height: 42,
+                      smoothness: v,
+                      borderRadius: BorderRadius.circular(14),
+                      color: selected
+                          ? const Color(0xFF2563EB)
+                          : palette.backgroundElement,
+                      side: BorderSide(
+                        color: selected
+                            ? const Color(0xFF60A5FA)
+                            : palette.backgroundSelected,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      v.toStringAsFixed(1),
+                      style: TextStyle(
+                        color: selected
+                            ? const Color(0xFF60A5FA)
+                            : palette.textSecondary,
+                        fontSize: 10,
+                        fontWeight:
+                            selected ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
           const SizedBox(height: 8),
           Text(
@@ -628,19 +672,22 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
           const SizedBox(height: 8),
           SmoothContainer(
             smoothness: _smoothness,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             color: const Color(0xFF2563EB),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {},
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
+                  padding: EdgeInsets.symmetric(vertical: 14),
                   child: Center(
                     child: Text(
                       'Test Button (Squircle)',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
                     ),
                   ),
                 ),
@@ -653,14 +700,20 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
               Expanded(
                 child: SmoothContainer(
                   smoothness: _smoothness,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   color: palette.backgroundElement,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   child: Row(
                     children: [
-                      const Icon(LucideIcons.sparkles, size: 14, color: Color(0xFF3B82F6)),
+                      const Icon(LucideIcons.sparkles,
+                          size: 14, color: Color(0xFF3B82F6)),
                       const SizedBox(width: 6),
-                      Text('Capsule', style: TextStyle(color: palette.text, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text('Capsule',
+                          style: TextStyle(
+                              color: palette.text,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -670,12 +723,20 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
                 onTap: () => setState(() => _switchActive = !_switchActive),
                 child: SmoothContainer(
                   smoothness: _smoothness,
-                  borderRadius: BorderRadius.circular(16),
-                  color: _switchActive ? const Color(0xFF2563EB) : palette.backgroundElement,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  borderRadius: BorderRadius.circular(22),
+                  color: _switchActive
+                      ? const Color(0xFF2563EB)
+                      : palette.backgroundElement,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Text(
                     _switchActive ? 'Active' : 'Off',
-                    style: TextStyle(color: _switchActive ? Colors.white : palette.textSecondary, fontSize: 12, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: _switchActive
+                            ? Colors.white
+                            : palette.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -684,9 +745,9 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
           const SizedBox(height: 8),
           SmoothContainer(
             smoothness: _smoothness,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             color: palette.backgroundElement,
-            padding: const EdgeInsets.all(3),
+            padding: const EdgeInsets.all(4),
             child: Row(
               children: [
                 for (int i = 0; i < 3; i++)
@@ -695,14 +756,18 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
                       onTap: () => setState(() => _activeTab = i),
                       child: SmoothContainer(
                         smoothness: _smoothness,
-                        borderRadius: BorderRadius.circular(10),
-                        color: _activeTab == i ? const Color(0xFF2563EB) : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        borderRadius: BorderRadius.circular(12),
+                        color: _activeTab == i
+                            ? const Color(0xFF2563EB)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Center(
                           child: Text(
                             'Tab ${i + 1}',
                             style: TextStyle(
-                              color: _activeTab == i ? Colors.white : palette.textSecondary,
+                              color: _activeTab == i
+                                  ? Colors.white
+                                  : palette.textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
