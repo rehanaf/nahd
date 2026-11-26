@@ -616,6 +616,26 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
             ],
           ),
           const SizedBox(height: 12),
+          Center(
+            child: SmoothContainer(
+              width: 92,
+              height: 92,
+              smoothness: _smoothness,
+              borderRadius: BorderRadius.circular(30),
+              color: const Color(0xFF2563EB),
+              child: Center(
+                child: Text(
+                  _smoothness.toStringAsFixed(1),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: _values.map((v) {
@@ -625,10 +645,10 @@ class _SquircleTestSectionState extends State<_SquircleTestSection> {
                 child: Column(
                   children: [
                     SmoothContainer(
-                      width: 42,
-                      height: 42,
+                      width: 48,
+                      height: 48,
                       smoothness: v,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                       color: selected
                           ? const Color(0xFF2563EB)
                           : palette.backgroundElement,
