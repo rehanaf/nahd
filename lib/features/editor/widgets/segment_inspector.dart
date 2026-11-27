@@ -81,9 +81,6 @@ class _AccordionState extends State<_Accordion> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: palette.border)),
-              ),
               child: widget.child,
             ),
         ],
@@ -432,12 +429,6 @@ class _SegmentInspectorState extends State<SegmentInspector> {
               .toList(),
         );
 
-    final roots = figure.getFigureRoots();
-    final figRoot = _rootOfSegment(figure, seg);
-    final figIndex = roots.indexOf(figRoot);
-    final figVisibleNow = figure.getFigureVisibility(figRoot, c.currentTime);
-    final figKfCount = figure.getFigureVisibilityKeyframes(figRoot).length;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -456,15 +447,16 @@ class _SegmentInspectorState extends State<SegmentInspector> {
                   ),
                 ),
               ),
-              IconButton(
-                icon: Icon(
-                  style.hidden ? LucideIcons.eye_off : LucideIcons.eye,
-                  size: 16,
-                  color: style.hidden ? const Color(0xFFFB923C) : palette.textSecondary,
+              if (!isAnimating)
+                IconButton(
+                  icon: Icon(
+                    style.hidden ? LucideIcons.eye_off : LucideIcons.eye,
+                    size: 16,
+                    color: style.hidden ? const Color(0xFFFB923C) : palette.textSecondary,
+                  ),
+                  onPressed: () => _change(seg, 'hidden', !style.hidden),
+                  visualDensity: VisualDensity.compact,
                 ),
-                onPressed: () => _change(seg, 'hidden', !style.hidden),
-                visualDensity: VisualDensity.compact,
-              ),
               Tooltip(
                 message: 'Hapus',
                 child: IconButton(
@@ -499,102 +491,29 @@ class _SegmentInspectorState extends State<SegmentInspector> {
           ),
           const SizedBox(height: 4),
 
-          if (isAnimating) ...[
-            _Accordion(
-              title: 'Figure ${figIndex + 1}',
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            figure.setFigureVisibility(
-                                figRoot, c.currentTime, !figVisibleNow,
-                                authoredTimes: c.authoredFrameTimes());
-                            c.forceUpdate();
-                            c.pushHistory();
-                          },
-                          child: Row(
-                            children: [
-                              Icon(
-                                figVisibleNow
-                                    ? LucideIcons.eye
-                                    : LucideIcons.eye_off,
-                                size: 16,
-                                color: figVisibleNow
-                                    ? const Color(0xFF22C55E)
-                                    : const Color(0xFF6B7280),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                figVisibleNow ? 'Visible' : 'Invisible',
-                                style: TextStyle(
-                                  color: figVisibleNow
-                                      ? palette.text
-                                      : palette.textSecondary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Text('$figKfCount kf',
-                          style: TextStyle(
-                              fontSize: 10, color: palette.textSecondary)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  InkWell(
-                    onTap: () => c.removeFigureAt(figRoot),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0x1AEF4444),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: palette.border),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(LucideIcons.delete, size: 14, color: Color(0xFFF87171)),
-                          const SizedBox(width: 8),
-                          Text('Hapus Permanen dari Scene',
-                              style: TextStyle(
-                                  color: Color(0xFFF87171),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
           _Accordion(
             title: 'Segment Type',
             child: typePicker(['line', 'circle', 'image', 'none']),
           ),
 
-          _Accordion(
-            title: 'Collision',
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text('Part ikut collision',
-                      style: TextStyle(
-                          color: palette.textSecondary, fontSize: 13)),
-                ),
-                Switch(
-                  value: style.isCollision,
-                  onChanged: (v) => _change(seg, 'isCollision', v),
-                  activeTrackColor: const Color(0xFF22C55E),
-                ),
-              ],
+          if (!isAnimating)
+            _Accordion(
+              title: 'Collision',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('Part ikut collision',
+                        style: TextStyle(
+                            color: palette.textSecondary, fontSize: 13)),
+                  ),
+                  Switch(
+                    value: style.isCollision,
+                    onChanged: (v) => _change(seg, 'isCollision', v),
+                    activeTrackColor: const Color(0xFF22C55E),
+                  ),
+                ],
+              ),
             ),
-          ),
 
           _Accordion(
             title: 'Transform',

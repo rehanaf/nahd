@@ -81,7 +81,6 @@ class AnimationTransport extends StatelessWidget {
             ),
           ),
           EditorIconButton(icon: LucideIcons.skip_forward, onTap: goNext),
-          Container(width: 1, height: 24, color: palette.border),
           const SizedBox(width: 2),
           Material(
             color: controller.isPlaying

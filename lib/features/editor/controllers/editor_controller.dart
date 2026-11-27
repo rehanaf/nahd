@@ -237,14 +237,18 @@ class EditorController extends ChangeNotifier {
       final data = await ProjectStorage.loadProjectData(projectId);
       if (data != null) {
         if (data.figure != null) {
-          final parsed = Figure.fromJsonString(data.figure!);
-          if (parsed.segments.isNotEmpty) figure = parsed;
+          try {
+            final parsed = Figure.fromJsonString(data.figure!);
+            if (parsed.segments.isNotEmpty) figure = parsed;
+          } catch (_) {}
         }
         if (data.animation != null) {
-          anim = FigureAnimation.fromJsonString(
-            data.animation!,
-            legacyFps: figure.fps,
-          );
+          try {
+            anim = FigureAnimation.fromJsonString(
+              data.animation!,
+              legacyFps: figure.fps,
+            );
+          } catch (_) {}
         }
       }
     }
@@ -485,8 +489,9 @@ class EditorController extends ChangeNotifier {
       final last = duration.floor();
       for (var f = 0; f <= last; f++) {
         final ft = f.toDouble();
-        if (track2.keyframes.any((kf) => (kf.time - ft).abs() < 0.001))
+        if (track2.keyframes.any((kf) => (kf.time - ft).abs() < 0.001)) {
           continue;
+        }
         final val = track2.getValue(ft, autoEasing);
         if (val != null) {
           track2.addKeyframe(ft, val.x, val.y);
@@ -1213,16 +1218,6 @@ class EditorController extends ChangeNotifier {
       color,
       authoredTimes: authoredFrameTimes(),
     );
-    final last = duration.floor();
-    for (var f = 0; f <= last; f++) {
-      final t = f.toDouble();
-      final track = figure.colors[root.toString()];
-      if (track != null && track.any((kf) => (kf.time - t).abs() < 0.001)) {
-        continue;
-      }
-      final v = figure.getFigureColorOverride(root, t);
-      if (v != null) figure.setFigureColorOverride(root, t, v);
-    }
 
     pushHistory();
     forceUpdate();
@@ -1444,6 +1439,8 @@ class EditorController extends ChangeNotifier {
     isPlaying = false;
     _playbackTimer?.cancel();
     _playbackTimer = null;
+    currentTime = currentTime.roundToDouble();
+    _applyAnimationAt(currentTime);
     notifyListeners();
   }
 

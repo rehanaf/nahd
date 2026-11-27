@@ -38,21 +38,10 @@ class OpacityPaintGroups {
   void paint(Canvas canvas) {
     for (final opacity in _order) {
       final draws = _groups[opacity]!;
-      if (opacity >= 0.9999) {
-        for (final draw in draws) {
-          draw();
-        }
-        continue;
-      }
-
-      canvas.saveLayer(
-        null,
-        Paint()..color = Color.fromRGBO(0, 0, 0, opacity),
-      );
+      // Bypass saveLayer on Flutter Web to prevent CanvasKit black screen bug
       for (final draw in draws) {
         draw();
       }
-      canvas.restore();
     }
   }
 }

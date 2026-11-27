@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:smooth_corner/smooth_corner.dart';
 
-import '../../../core/app_version.dart';
 import '../../../core/project_io.dart';
 import '../../../core/project_storage.dart';
 import '../../../core/scene/predefined_projects.dart';
@@ -11,6 +10,7 @@ import '../controllers/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../editor/widgets/figure_preview.dart';
 import '../../update/update_dialog.dart';
+import 'profile_screen.dart';
 
 part 'main_menu_tiles.dart';
 part 'main_menu_sheets.dart';
@@ -67,6 +67,7 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
   late ProjectType _tab;
+  int _navIndex = 0;
   List<ProjectMeta> _projects = [];
   List<ProjectGroup> _groups = [];
   bool _loading = true;
@@ -78,6 +79,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void initState() {
     super.initState();
     _tab = widget.initialTab;
+    _navIndex = _tabToNavIndex(_tab);
     _refresh();
     showUpdateDialogIfAny(context);
   }
@@ -101,10 +103,51 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void _handleTabChange(ProjectType t) {
     setState(() {
       _tab = t;
+      _navIndex = _tabToNavIndex(t);
       _activeGroup = null;
     });
     widget.onTabChanged(t);
     _refresh();
+  }
+
+  int _tabToNavIndex(ProjectType t) {
+    switch (t) {
+      case ProjectType.animation:
+        return 0;
+      case ProjectType.preset:
+        return 1;
+      case ProjectType.figure:
+        return 2;
+    }
+  }
+
+  ProjectType _navIndexToTab(int i) {
+    switch (i) {
+      case 0:
+        return ProjectType.animation;
+      case 1:
+        return ProjectType.preset;
+      case 2:
+        return ProjectType.figure;
+      default:
+        return ProjectType.animation;
+    }
+  }
+
+  void _onNavTap(int index) {
+    if (index == 4) {
+      // Profile tab
+      setState(() => _navIndex = 4);
+      return;
+    }
+    if (index == 3) {
+      // Center plus button — create project
+      _fabPress();
+      return;
+    }
+    // Project tabs: 0=Animation, 1=Preset, 2=Figure
+    final type = _navIndexToTab(index);
+    _handleTabChange(type);
   }
 
   List<_GroupRef> get _groupList {
@@ -361,55 +404,124 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  String get _initials {
-    final name = widget.app.profileName.trim();
-    return ((name.isEmpty ? 'G' : name).substring(0, 2)).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     final palette = Theme.of(context).appColors;
+    final isProfile = _navIndex == 4;
     return Scaffold(
       backgroundColor: palette.background,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _appBar(palette),
-                _tabs(palette),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: _loading
+      body: SafeArea(
+        child: Column(
+          children: [
+            _appBar(palette),
+            if (!isProfile) ...[
+              _tabs(palette),
+              const SizedBox(height: 4),
+            ],
+            Expanded(
+              child: isProfile
+                  ? ProfileScreen(
+                      app: widget.app,
+                      onClearData: _confirmClearData,
+                    )
+                  : _loading
                       ? const Center(child: CircularProgressIndicator())
                       : _activeGroup == null
                           ? _groupsView(palette)
                           : _groupDetailView(palette),
-                ),
-              ],
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _bottomNav(palette),
+    );
+  }
+
+  Widget _bottomNav(AppPalette palette) {
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.backgroundElement,
+        border: Border(top: BorderSide(color: palette.border, width: 0.5)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 56,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Row(
+                children: [
+                  _navItem(0, LucideIcons.film, 'Animation', palette),
+                  _navItem(1, LucideIcons.user_check, 'Preset', palette),
+                  _navCenter(palette),
+                  _navItem(2, LucideIcons.layout_grid, 'Figure', palette),
+                  _navItem(4, LucideIcons.user, 'Profile', palette),
+                ],
+              ),
             ),
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _fabPress,
-        backgroundColor: const Color(0xFF2563EB),
-        child: const Icon(LucideIcons.plus, color: Colors.white, size: 26),
+        ),
       ),
     );
   }
 
-  Future<void> _openProfile() {
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _ProfileSheet(
-        app: widget.app,
-        onClearData: () {
-          Navigator.of(context).pop();
-          _confirmClearData();
-        },
+  Widget _navItem(int index, IconData icon, String label, AppPalette palette) {
+    final active = _navIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onNavTap(index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: active ? const Color(0xFF2563EB) : palette.textSecondary,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                color: active ? const Color(0xFF2563EB) : palette.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navCenter(AppPalette palette) {
+    return Expanded(
+      child: Center(
+        child: GestureDetector(
+          onTap: _fabPress,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x402563EB),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SmoothContainer(
+              width: 44,
+              height: 44,
+              smoothness: 1.0,
+              borderRadius: BorderRadius.circular(14),
+              color: const Color(0xFF2563EB),
+              alignment: Alignment.center,
+              child: const Icon(LucideIcons.plus, color: Colors.white, size: 24),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -433,37 +545,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               ),
             ),
           ),
-          InkWell(
-            onTap: _handleImport,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Icon(LucideIcons.archive,
-                  size: 20, color: palette.text),
-            ),
-          ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: _openProfile,
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: Color(0xFF2563EB),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                _initials,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
+          if (_navIndex != 4)
+            InkWell(
+              onTap: _handleImport,
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(LucideIcons.archive,
+                    size: 20, color: palette.text),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -474,11 +565,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          _tabButton(palette, ProjectType.animation, LucideIcons.film, 'Animation'),
-          const SizedBox(width: 8),
-          _tabButton(palette, ProjectType.preset, LucideIcons.user_check, 'Preset'),
-          const SizedBox(width: 8),
-          _tabButton(palette, ProjectType.figure, LucideIcons.layout_grid, 'Figure'),
+          Text(
+            _tab == ProjectType.animation
+                ? 'Animation'
+                : _tab == ProjectType.preset
+                    ? 'Preset'
+                    : 'Figure',
+            style: TextStyle(
+              color: palette.text,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const Spacer(),
           _sortButton(palette),
           const SizedBox(width: 8),
@@ -492,13 +590,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return InkWell(
       onTap: _showSortSheet,
       borderRadius: BorderRadius.circular(20),
-      child: Container(
+      child: SmoothContainer(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: palette.backgroundElement,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: palette.backgroundSelected),
-        ),
+        smoothness: 1.0,
+        borderRadius: BorderRadius.circular(12),
+        color: palette.backgroundElement,
+        side: BorderSide(color: palette.backgroundSelected),
         child: Icon(LucideIcons.arrow_down_up, size: 16, color: palette.text),
       ),
     );
@@ -507,14 +604,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Widget _addGroupButton(AppPalette palette) {
     return InkWell(
       onTap: _addGroupPress,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
+      borderRadius: BorderRadius.circular(12),
+      child: SmoothContainer(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: palette.backgroundElement,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: palette.backgroundSelected),
-        ),
+        smoothness: 1.0,
+        borderRadius: BorderRadius.circular(12),
+        color: palette.backgroundElement,
+        side: BorderSide(color: palette.backgroundSelected),
         child: Row(
           children: [
             Icon(LucideIcons.folder_plus,
@@ -526,40 +622,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   color: palette.text,
                   fontSize: 13,
                   fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _tabButton(AppPalette palette, ProjectType type, IconData icon, String label) {
-    final active = _tab == type;
-    return InkWell(
-      onTap: () => _handleTabChange(type),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-        decoration: BoxDecoration(
-          color: active ? palette.backgroundElement : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: active ? palette.backgroundSelected : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon,
-                size: 15,
-                color: active ? palette.text : palette.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? palette.text : palette.textSecondary,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ],
         ),

@@ -4,6 +4,13 @@ extension _PointModifyTool on _FigureCanvasState {
   void handlePointModifyStart(Offset w, EditorTool tool, Figure fig) {
     if (tool == EditorTool.point) {
       final ptHit = _hitTestPoint(w);
+      if (ptHit < 0) {
+        widget.controller.setSelectedPoint(null);
+        widget.controller.setSelectedSegment(null);
+        widget.controller.clearMultiSelect();
+        widget.controller.forceUpdate();
+        return;
+      }
       if (ptHit >= 0) {
         widget.controller.setSelectedPoint(ptHit);
         final cs = _segmentTouching(fig, ptHit);
@@ -37,6 +44,13 @@ extension _PointModifyTool on _FigureCanvasState {
 
     if (tool == EditorTool.modify) {
       final ptHit = _hitTestPoint(w);
+      if (ptHit < 0) {
+        widget.controller.setSelectedPoint(null);
+        widget.controller.setSelectedSegment(null);
+        widget.controller.clearMultiSelect();
+        widget.controller.forceUpdate();
+        return;
+      }
       if (ptHit >= 0) {
         widget.controller.setSelectedPoint(ptHit);
         final cs = _segmentTouching(fig, ptHit);

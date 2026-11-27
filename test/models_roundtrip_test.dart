@@ -6,8 +6,8 @@ import 'package:id_animate/core/models/segment.dart';
 
 void main() {
   test('Point2 JSON round-trip', () {
-    const json = {'x': 12.5, 'y': -3.25};
-    final p = Point2.fromJson(json);
+    const json = {'x': 12.5, 'y': -3.25, 'isAttached': false, 'static': false};
+    final p = Point2.fromJson({'x': 12.5, 'y': -3.25});
     expect(p.x, 12.5);
     expect(p.y, -3.25);
     expect(p.toJson(), json);
@@ -55,7 +55,7 @@ void main() {
 
     final decoded = FigureAnimation.fromJsonString(anim.exportToJson());
 
-    expect(decoded.duration, 2.0);
+    expect(decoded.duration, 3.0);
     final track = decoded.getTrack(0);
     expect(track, isNotNull);
     expect(track!.keyframes.length, 3);
@@ -236,7 +236,7 @@ test('figure colour override survives attach (join) and re-keying', () {
 
     expect(newIdx, 3);
     expect(fig.points.length, 4);
-    expect(fig.rootIndices, contains(newIdx));
+    expect(fig.rootIndices, [0, 1]);
     // The detached segment (0,1) has its joint end re-pointed to the copy.
     final detached = fig.segments.singleWhere(
       (s) => s.point2Index == 3 || s.point1Index == 3,

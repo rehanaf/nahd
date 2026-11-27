@@ -5,6 +5,13 @@ extension _SelectJoinTool on _FigureCanvasState {
     // ATTACH tool: can drag either an attached (orange) point OR any root pivot.
     if (tool == EditorTool.attach) {
       final ptHit = _hitTestPoint(w);
+      if (ptHit < 0) {
+        widget.controller.setSelectedPoint(null);
+        widget.controller.setSelectedSegment(null);
+        widget.controller.clearMultiSelect();
+        widget.controller.forceUpdate();
+        return;
+      }
       if (ptHit >= 0) {
         final pt = fig.points[ptHit];
         final isAttachedPt = pt.isAttached;
@@ -99,6 +106,13 @@ extension _SelectJoinTool on _FigureCanvasState {
 
     if (tool == EditorTool.join) {
       final ptHit = _hitTestPoint(w);
+      if (ptHit < 0) {
+        widget.controller.setSelectedPoint(null);
+        widget.controller.setSelectedSegment(null);
+        widget.controller.clearMultiSelect();
+        widget.controller.forceUpdate();
+        return;
+      }
       if (ptHit >= 0) {
         widget.controller.setSelectedPoint(ptHit);
         final cs = _segmentTouching(fig, ptHit);
@@ -193,6 +207,7 @@ extension _SelectJoinTool on _FigureCanvasState {
       widget.controller.setSelectedPoint(null);
       final segHit = _hitTestSegment(w);
       widget.controller.setSelectedSegment(segHit);
+      widget.controller.forceUpdate();
     }
   }
 

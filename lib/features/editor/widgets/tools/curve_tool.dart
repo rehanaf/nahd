@@ -73,6 +73,10 @@ extension _CurveTool on _FigureCanvasState {
         widget.controller.pushHistory();
         return;
       }
+      widget.controller.setSelectedPoint(null);
+      widget.controller.setSelectedSegment(null);
+      widget.controller.clearMultiSelect();
+      widget.controller.forceUpdate();
     }
   }
 }

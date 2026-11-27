@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import '../../../core/models/figure.dart';
 import '../../../core/models/segment.dart';
 import '../../../core/pose_library.dart';
 import '../../../core/project_storage.dart';
+import '../../../core/scene/predefined_projects.dart';
 import '../../../core/render/figure_render.dart';
 import '../controllers/editor_controller.dart';
 import '../controllers/editor_controller_svg_extension.dart';
@@ -31,23 +31,24 @@ const Color kToolColor = Color(0xFF2563EB);
 class EditorScreen extends StatefulWidget {
   final EditorController controller;
   final VoidCallback onBack;
+  final void Function(String id, ProjectType type)? onOpenProject;
 
   const EditorScreen({
     super.key,
     required this.controller,
     required this.onBack,
+    this.onOpenProject,
   });
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
 }
 
-enum _RightTab { settings, inspector, layers }
+enum _RightTab { settings, inspector, layers, addSegment }
 
 class _EditorScreenState extends State<EditorScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   _RightTab? _rightTab;
-  bool _showMenu = false;
 
   String _lastModifyKey = 'point';
   String _lastTransformKey = 'moveAll';
@@ -142,152 +143,6 @@ class _EditorScreenState extends State<EditorScreen> {
     c.pushHistory();
   }
 
-  void _handleReset() {
-    final c = widget.controller;
-    final f = Figure();
-    if (c.isAnimateMode) f.points = [];
-    c.setFigure(f);
-    c.setSelectedSegment(null);
-    c.setSelectedPoint(null);
-    c.pointModes.clear();
-    c.forceUpdate();
-  }
-
-  Future<void> _handleAddFigure(ProjectMeta meta) async {
-    final c = widget.controller;
-    try {
-      final data = await ProjectStorage.loadProjectData(meta.id);
-      if (data?.figure == null) return;
-      final src = Figure.fromJsonString(data!.figure!);
-      if (src.points.isEmpty) return;
-
-      final srcPts = src.points;
-      final offsetX = 0.0;
-      final offsetY = 0.0;
-
-      final indexMap = <int, int>{};
-      final base = c.figure.points.length;
-      for (var i = 0; i < srcPts.length; i++) {
-        indexMap[i] = base + i;
-        c.figure.points.add(
-          Point2(srcPts[i].x + offsetX, srcPts[i].y + offsetY),
-        );
-      }
-      final roots = c.figure.rootIndices;
-      final newRoots = <int>[];
-      for (final r in src.rootIndices) {
-        final mapped = indexMap[r];
-        if (mapped == null) continue;
-        newRoots.add(mapped);
-        if (!roots.contains(mapped)) roots.add(mapped);
-      }
-      if (c.isAnimateMode) {
-        final authoredTimes = c.authoredFrameTimes();
-        for (final r in newRoots) {
-          final t = c.currentTime.roundToDouble();
-          c.figure.setFigureVisibility(r, 0.0, false);
-          if (t > 0.001) {
-            c.figure.setFigureVisibility(
-              r,
-              t,
-              true,
-              authoredTimes: authoredTimes,
-            );
-          } else {
-            c.figure.setFigureVisibility(r, 0.0, true);
-            final next = authoredTimes
-                .where((at) => at.roundToDouble() > 0.0)
-                .fold<double?>(null, (p, at) {
-                  final rt = at.roundToDouble();
-                  return p == null || rt < p ? rt : p;
-                });
-            if (next != null) {
-              c.figure.visibility
-                  .putIfAbsent(r.toString(), () => [])
-                  .removeWhere((kf) => (kf.time - next).abs() < 0.001);
-              c.figure.visibility[r.toString()]!.add(
-                VisibilityKeyframe(next, false),
-              );
-              c.figure.visibility[r.toString()]!.sort(
-                (a, b) => a.time.compareTo(b.time),
-              );
-            }
-          }
-        }
-      }
-      final segIdMap = <String, String>{};
-      for (final s in src.segments) {
-        final p1 = indexMap[s.point1Index];
-        final p2 = indexMap[s.point2Index];
-        if (p1 == null || p2 == null) continue;
-        final ns = s.clone();
-        // A pasted figure/preset must not share segment ids with the source
-        // project; per-frame overrides are keyed by id, so give it fresh ones.
-        final newId = Segment(ns.type).id;
-        segIdMap[s.id] = newId;
-        ns.id = newId;
-        ns.point1Index = p1;
-        ns.point2Index = p2;
-        ns.layer = (ns.layer) + c.figure.segments.length;
-        c.figure.segments.add(ns);
-      }
-      src.remappedAttachedSegments(segIdMap, indexMap).forEach((joint, ids) {
-        c.figure.attachedSegments[joint] = ids;
-      });
-      src.cycleFills.forEach((key, entry) {
-        final parts = key
-            .split(',')
-            .map(int.tryParse)
-            .whereType<int>()
-            .toList();
-        if (parts.length < 2) return;
-        final mapped = parts.map((p) => indexMap[p]).whereType<int>().toList();
-        if (mapped.length != parts.length) return;
-        mapped.sort();
-        c.figure.cycleFills[mapped.join(',')] = entry.clone();
-      });
-      String? remapOverrideKey(String key) {
-        final parts = key.split(':');
-        if (parts.length >= 3 && parts[0] == 'seg') {
-          final newId = segIdMap[parts[1]];
-          if (newId == null) return null;
-          return ['seg', newId, ...parts.skip(2)].join(':');
-        }
-        if (parts.length >= 3 && parts[0] == 'cycle') {
-          final ids = parts[1]
-              .split(',')
-              .map(int.tryParse)
-              .whereType<int>()
-              .toList();
-          final mapped = ids.map((p) => indexMap[p]).whereType<int>().toList();
-          if (mapped.length != ids.length) return null;
-          mapped.sort();
-          return ['cycle', mapped.join(','), ...parts.skip(2)].join(':');
-        }
-        return key;
-      }
-
-      src.frameOverrides.forEach((frame, values) {
-        final mapped = <String, dynamic>{};
-        values.forEach((key, value) {
-          final newKey = remapOverrideKey(key.toString());
-          if (newKey != null) mapped[newKey] = value;
-        });
-        if (mapped.isNotEmpty) {
-          c.figure.frameOverrides[frame] = Map<String, dynamic>.from(
-            c.figure.frameOverrides[frame] ?? {},
-          )..addAll(mapped);
-        }
-      });
-      c.recordPointsAtCurrentFrame(indexMap.values);
-      c.mergeGroupsFrom(src, segIdMap);
-      c.forceUpdate();
-      c.pushHistory();
-    } catch (_) {
-      // ignore
-    }
-  }
-
   void _showSnack(String message) {
     final palette = Theme.of(context).appColors;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -341,16 +196,16 @@ class _EditorScreenState extends State<EditorScreen> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.black26,
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    "Add Asset / Segment",
+                    "Menu & Projects",
                     style: TextStyle(
                       color: palette.text,
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -364,193 +219,128 @@ class _EditorScreenState extends State<EditorScreen> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              "ADD SEGMENT",
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _drawerSegmentIcon(
-                  icon: LucideIcons.pencil,
-                  label: 'Line',
-                  color: kToolColor,
-                  onTap: () {
-                    c.addSegment('line');
-                    Navigator.of(context).pop();
-                  },
-                  palette: palette,
-                ),
-                _drawerSegmentIcon(
-                  icon: LucideIcons.circle,
-                  label: 'Circle',
-                  color: kToolColor,
-                  onTap: () {
-                    c.addSegment('circle');
-                    Navigator.of(context).pop();
-                  },
-                  palette: palette,
-                ),
-                _drawerSegmentIcon(
-                  icon: LucideIcons.image,
-                  label: 'Image',
-                  color: kToolColor,
-                  onTap: () => _pickAndAddImageSegment(c),
-                  palette: palette,
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 24, indent: 12, endIndent: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              c.isAnimateMode
-                  ? "ADD FIGURE / PRESET ASSET"
-                  : "ADD FIGURE ASSET",
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
           Expanded(
-            child: FutureBuilder<List<dynamic>>(
-              future: Future.wait([
-                ProjectStorage.listGroups(ProjectType.figure),
-                ProjectStorage.listProjects(ProjectType.figure),
-                ProjectStorage.listGroups(ProjectType.preset),
-                ProjectStorage.listProjects(ProjectType.preset),
-              ]),
-              builder: (ctx, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            child: FutureBuilder<List<ProjectMeta>>(
+              future: ProjectStorage.listProjects(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final data = snapshot.data ?? [[], [], [], []];
-                final figureGroups = List<ProjectGroup>.from(data[0] as List);
-                final groups = <ProjectGroup>[
-                  ...figureGroups,
-                  ...List<ProjectGroup>.from(
-                    data[2] as List,
-                  ).where((g) => !figureGroups.any((f) => f.id == g.id)),
-                ];
-                final projects = <ProjectMeta>[
-                  ...List<ProjectMeta>.from(data[1] as List),
-                  // Animation (and Preset) scenes can re-create objects by
-                  // importing a preset at the current frame.
-                  if (c.isAnimateMode)
-                    ...List<ProjectMeta>.from(data[3] as List),
-                ];
-                final filtered = projects
-                    .where((p) => p.id != c.projectId)
-                    .toList();
-                if (filtered.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
+                final projects = snapshot.data!;
+                return ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  children: [
+                    ListTile(
+                      dense: true,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      leading: Icon(LucideIcons.plus, size: 18, color: kToolColor),
+                      title: Text(
+                        'Buat Projek Baru',
+                        style: TextStyle(color: palette.text, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      onTap: () async {
+                        Navigator.of(context).pop();
+                        final name = await _showCreateProjectPrompt(context, palette, c.projectType ?? ProjectType.animation);
+                        if (name != null && name.trim().isNotEmpty && widget.onOpenProject != null) {
+                          final meta = await ProjectStorage.createProject(c.projectType ?? ProjectType.animation, name);
+                          widget.onOpenProject!(meta.id, meta.type);
+                        }
+                      },
+                    ),
+                    ListTile(
+                      dense: true,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      leading: Icon(LucideIcons.arrow_left, size: 18, color: palette.textSecondary),
+                      title: Text(
+                        'Kembali (Menu Utama)',
+                        style: TextStyle(color: palette.text, fontSize: 14),
+                      ),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        widget.onBack();
+                      },
+                    ),
+                    const Divider(height: 24, thickness: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                       child: Text(
-                        c.isAnimateMode
-                            ? "No figures or presets found"
-                            : "No other figures found",
+                        "PILIH PROJEK",
                         style: TextStyle(
                           color: palette.textSecondary,
-                          fontSize: 12,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  );
-                }
-
-                final grouped = <String?, List<ProjectMeta>>{};
-                for (final p in filtered) {
-                  grouped.putIfAbsent(p.groupId, () => []).add(p);
-                }
-
-                final displayGroups = <Widget>[];
-
-                for (final group in groups) {
-                  final groupProjects = grouped[group.id] ?? [];
-                  if (groupProjects.isEmpty) continue;
-                  displayGroups.add(
-                    Theme(
-                      data: Theme.of(
-                        context,
-                      ).copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        title: Text(
-                          group.name,
-                          style: TextStyle(
-                            color: palette.text,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                    if (projects.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Center(
+                          child: Text(
+                            'No projects found',
+                            style: TextStyle(color: palette.textSecondary, fontSize: 13),
                           ),
                         ),
-                        leading: Icon(
-                          LucideIcons.folder,
-                          color: palette.textSecondary,
-                          size: 18,
-                        ),
-                        childrenPadding: const EdgeInsets.only(left: 16),
-                        initiallyExpanded: true,
-                        children: groupProjects
-                            .map((p) => _buildFigureListTile(p, palette))
-                            .toList(),
-                      ),
-                    ),
-                  );
-                }
-
-                final activeGroupIds = groups.map((g) => g.id).toSet();
-                final ungroupedProjects = filtered
-                    .where(
-                      (p) =>
-                          p.groupId == null ||
-                          !activeGroupIds.contains(p.groupId),
-                    )
-                    .toList();
-                if (ungroupedProjects.isNotEmpty) {
-                  displayGroups.add(
-                    Theme(
-                      data: Theme.of(
-                        context,
-                      ).copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        title: Text(
-                          "Default / Ungrouped",
-                          style: TextStyle(
-                            color: palette.text,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                      )
+                    else
+                      ...projects.map((meta) {
+                        final isCurrent = meta.id == c.projectId;
+                        return ListTile(
+                          dense: true,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ),
-                        leading: Icon(
-                          LucideIcons.folder_open,
-                          color: palette.textSecondary,
-                          size: 18,
-                        ),
-                        childrenPadding: const EdgeInsets.only(left: 16),
-                        initiallyExpanded: true,
-                        children: ungroupedProjects
-                            .map((p) => _buildFigureListTile(p, palette))
-                            .toList(),
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  children: displayGroups,
+                          tileColor: isCurrent ? palette.backgroundElement.withValues(alpha: 0.8) : null,
+                          selected: isCurrent,
+                          leading: Icon(
+                            meta.type == ProjectType.animation
+                                ? LucideIcons.film
+                                : meta.type == ProjectType.preset
+                                    ? LucideIcons.box
+                                    : LucideIcons.user,
+                            size: 18,
+                            color: isCurrent ? kToolColor : palette.textSecondary,
+                          ),
+                          title: Text(
+                            meta.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: palette.text,
+                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            meta.type.name.toUpperCase(),
+                            style: TextStyle(color: palette.textSecondary, fontSize: 10),
+                          ),
+                          trailing: isCurrent
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: kToolColor.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Current',
+                                    style: TextStyle(color: kToolColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                )
+                              : null,
+                          onTap: widget.onOpenProject == null
+                              ? null
+                              : () {
+                                  Navigator.of(context).pop();
+                                  widget.onOpenProject!(meta.id, meta.type);
+                                },
+                        );
+                      }),
+                  ],
                 );
               },
             ),
@@ -560,31 +350,132 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Widget _buildFigureListTile(ProjectMeta meta, AppPalette palette) {
-    return Card(
-      color: palette.background,
-      margin: const EdgeInsets.only(bottom: 8, right: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: palette.border, width: 0.5),
-      ),
-      child: ListTile(
-        dense: true,
-        title: Text(
-          meta.name,
-          style: TextStyle(color: palette.text, fontWeight: FontWeight.bold),
+  Future<String?> _showCreateProjectPrompt(BuildContext context, AppPalette palette, ProjectType type) async {
+    final textController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.backgroundElement,
+        title: Text('Buat Projek Baru', style: TextStyle(color: palette.text)),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          style: TextStyle(color: palette.text),
+          decoration: InputDecoration(
+            hintText: 'Nama projek...',
+            hintStyle: TextStyle(color: palette.textSecondary),
+          ),
         ),
-        subtitle: Text(
-          "${meta.type == ProjectType.preset ? 'Preset' : 'Figure'} · "
-          "ID: ${meta.id.substring(0, math.min(8, meta.id.length))}...",
-          style: TextStyle(color: palette.textSecondary, fontSize: 11),
-        ),
-        trailing: Icon(LucideIcons.plus, color: palette.text, size: 16),
-        onTap: () {
-          _handleAddFigure(meta);
-          Navigator.of(context).pop();
-        },
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text('Batal', style: TextStyle(color: palette.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: kToolColor),
+            onPressed: () => Navigator.of(ctx).pop(textController.text),
+            child: const Text('Buat', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
+    );
+  }
+
+  void _showAddMenuSheet(BuildContext context, EditorController c, AppPalette palette) {
+    _openRightTab(_RightTab.addSegment);
+  }
+
+  Widget _buildAddSegmentContent(EditorController c, AppPalette palette) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          "ADD SEGMENT",
+          style: TextStyle(
+            color: palette.textSecondary,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _drawerSegmentIcon(
+              icon: LucideIcons.pencil,
+              label: 'Line',
+              color: kToolColor,
+              onTap: () {
+                c.addSegment('line');
+                Navigator.of(context).pop();
+              },
+              palette: palette,
+            ),
+            _drawerSegmentIcon(
+              icon: LucideIcons.circle,
+              label: 'Circle',
+              color: kToolColor,
+              onTap: () {
+                c.addSegment('circle');
+                Navigator.of(context).pop();
+              },
+              palette: palette,
+            ),
+            _drawerSegmentIcon(
+              icon: LucideIcons.image,
+              label: 'Image',
+              color: kToolColor,
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickAndAddImageSegment(c);
+              },
+              palette: palette,
+            ),
+          ],
+        ),
+        const Divider(height: 24, thickness: 1),
+        Text(
+          "LIST FIGURE (TEMPLATES)",
+          style: TextStyle(
+            color: palette.textSecondary,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kToolColor,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(LucideIcons.user, size: 16),
+              label: const Text('Add Stickman'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                final fig = Figure.fromJsonString(PredefinedProjects.stickmanFigureJson);
+                c.mergeImportedFigure(fig);
+              },
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kToolColor,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(LucideIcons.circle, size: 16),
+              label: const Text('Add Bounce Ball'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                final fig = Figure.fromJsonString(PredefinedProjects.bounceFigureJson);
+                c.mergeImportedFigure(fig);
+              },
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -641,7 +532,9 @@ class _EditorScreenState extends State<EditorScreen> {
                         ? "Properties"
                         : tab == _RightTab.settings
                         ? "Animation Settings"
-                        : "Layers",
+                        : tab == _RightTab.layers
+                        ? "Layers"
+                        : "Add Segment & Figure",
                     style: TextStyle(
                       color: palette.text,
                       fontSize: 14,
@@ -663,6 +556,7 @@ class _EditorScreenState extends State<EditorScreen> {
               _RightTab.inspector => SegmentInspector(controller: c),
               _RightTab.settings => AnimationSettingsPanel(controller: c),
               _RightTab.layers => LayerPanel(controller: c),
+              _RightTab.addSegment => _buildAddSegmentContent(c, palette),
             },
           ),
         ],
@@ -726,10 +620,10 @@ class _EditorScreenState extends State<EditorScreen> {
                         width: 40,
                         height: 40,
                         child: InkWell(
-                          onTap: widget.onBack,
+                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
                           borderRadius: BorderRadius.circular(10),
                           child: Icon(
-                            LucideIcons.arrow_left,
+                            LucideIcons.menu,
                             size: 20,
                             color: palette.text,
                           ),
@@ -758,22 +652,10 @@ class _EditorScreenState extends State<EditorScreen> {
                     const SizedBox(width: 4),
                     OverlayCapsule(
                       padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          EditorIconButton(
-                            icon: LucideIcons.folder_plus,
-                            color: kToolColor,
-                            onTap: () =>
-                                _scaffoldKey.currentState?.openDrawer(),
-                          ),
-                          const SizedBox(width: 4),
-                          EditorIconButton(
-                            icon: LucideIcons.hand,
-                            color: kToolColor,
-                            active: c.panEnabled,
-                            onTap: c.togglePanEnabled,
-                          ),
-                        ],
+                      child: EditorIconButton(
+                        icon: LucideIcons.folder_plus,
+                        color: kToolColor,
+                        onTap: () => _showAddMenuSheet(context, c, palette),
                       ),
                     ),
                   ],
@@ -898,7 +780,7 @@ class _EditorScreenState extends State<EditorScreen> {
                         width: 40,
                         height: 40,
                         child: InkWell(
-                          onTap: () => setState(() => _showMenu = !_showMenu),
+                          onTap: () => _openMoreMenu(c, palette),
                           borderRadius: BorderRadius.circular(10),
                           child: Icon(
                             LucideIcons.ellipsis,
@@ -921,15 +803,12 @@ class _EditorScreenState extends State<EditorScreen> {
             child: c.isAnimateMode
                 ? OverlayCapsule(
                     padding: const EdgeInsets.all(4),
-                    child: SizedBox(
-                      width: 88,
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 4,
-                        runSpacing: 4,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Tooltip(
-                            message: 'Permanent Delete',
+                            message: 'Delete / Visibility',
                             child: EditorIconButton(
                               icon: LucideIcons.trash,
                               color: kToolColor,
@@ -953,308 +832,167 @@ class _EditorScreenState extends State<EditorScreen> {
                                     orElse: () => -1,
                                   );
                                   if (root != -1) {
-                                    c.removeFigureAt(root);
+                                    if (c.isAnimateMode) {
+                                      c.hideFigureAtCurrentFrame(ptIdx);
+                                    } else {
+                                      c.removeFigureAt(root);
+                                    }
                                   }
                                 }
                               },
                             ),
                           ),
-                          Tooltip(
-                            message: 'Attach Figure',
-                            child: EditorIconButton(
-                              icon: LucideIcons.link,
-                              color: kToolColor,
-                              active: c.activeTool == EditorTool.attach,
-                              onTap: () {
-                                c.setTool(
-                                  c.activeTool == EditorTool.attach
-                                      ? EditorTool.rotate
-                                      : EditorTool.attach,
-                                );
-                              },
-                            ),
-                          ),
-                          SizedBox(
-                            width: 88,
-                            height: 1,
-                            child: Center(
-                              child: Container(
-                                height: 1,
-                                width: 56,
-                                color: palette.border,
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Attach Figure',
+                              child: EditorIconButton(
+                                icon: LucideIcons.link,
+                                color: kToolColor,
+                                active: c.activeTool == EditorTool.attach,
+                                onTap: () {
+                                  c.setTool(
+                                    c.activeTool == EditorTool.attach
+                                        ? EditorTool.rotate
+                                        : EditorTool.attach,
+                                  );
+                                },
                               ),
                             ),
-                          ),
-                          Tooltip(
-                            message: 'Center Figure',
-                            child: EditorIconButton(
-                              icon: LucideIcons.focus,
-                              color: kToolColor,
-                              disabled:
-                                  c.selectedPointIndex == null &&
-                                  c.selectedSegmentId == null,
-                              onTap: () {
-                                final ptIdx =
-                                    c.selectedPointIndex ??
-                                    (c.selectedSegmentId != null
-                                        ? c.figure
-                                              .getSegment(c.selectedSegmentId!)
-                                              ?.point1Index
-                                        : null);
-                                if (ptIdx != null) {
-                                  c.centerFigureAt(ptIdx);
-                                }
-                              },
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Center Figure',
+                              child: EditorIconButton(
+                                icon: LucideIcons.focus,
+                                color: kToolColor,
+                                disabled:
+                                    c.selectedPointIndex == null &&
+                                    c.selectedSegmentId == null,
+                                onTap: () {
+                                  final ptIdx =
+                                      c.selectedPointIndex ??
+                                      (c.selectedSegmentId != null
+                                          ? c.figure
+                                                .getSegment(c.selectedSegmentId!)
+                                                ?.point1Index
+                                          : null);
+                                  if (ptIdx != null) {
+                                    c.centerFigureAt(ptIdx);
+                                  }
+                                },
+                              ),
                             ),
-                          ),
-                          Tooltip(
-                            message: 'Toggle Visibility',
-                            child: EditorIconButton(
-                              icon: LucideIcons.eye,
-                              color: kToolColor,
-                              disabled:
-                                  c.selectedPointIndex == null &&
-                                  c.selectedSegmentId == null,
-                              onTap: () {
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Opacity',
+                              child: EditorIconButton(
+                                icon: LucideIcons.droplet,
+                                color: kToolColor,
+                                disabled:
+                                    c.selectedPointIndex == null &&
+                                    c.selectedSegmentId == null,
+                                onTap: () {
+                                  final ptIdx = c.selectedFigurePoint();
+                                  if (ptIdx != null) {
+                                    _showOpacitySlider(c, ptIdx);
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Builder(
+                              builder: (btnCtx) {
                                 final ptIdx = c.selectedFigurePoint();
-                                if (ptIdx != null) {
-                                  c.toggleFigureVisibility(ptIdx);
-                                }
-                              },
-                            ),
-                          ),
-                          Tooltip(
-                            message: 'Opacity',
-                            child: EditorIconButton(
-                              icon: LucideIcons.droplet,
-                              color: kToolColor,
-                              disabled:
-                                  c.selectedPointIndex == null &&
-                                  c.selectedSegmentId == null,
-                              onTap: () {
-                                final ptIdx = c.selectedFigurePoint();
-                                if (ptIdx != null) {
-                                  _showOpacitySlider(c, ptIdx);
-                                }
-                              },
-                            ),
-                          ),
-                          Builder(
-                            builder: (btnCtx) {
-                              final ptIdx = c.selectedFigurePoint();
-                              final hasSelection =
-                                  ptIdx != null &&
-                                  ptIdx >= 0 &&
-                                  ptIdx < c.figure.points.length;
-                              final cur = hasSelection
-                                  ? c.figureColorOverrideAt(ptIdx)
-                                  : null;
-                              return Tooltip(
-                                message: hasSelection
-                                    ? (cur != null
-                                          ? 'Figure Color (tap to change, long-press to clear)'
-                                          : 'Figure Color')
-                                    : 'Figure Color',
-                                child: GestureDetector(
-                                  onLongPress: hasSelection
-                                      ? () => c.clearFigureColorOverride(ptIdx)
-                                      : null,
-                                  child: ColorCircle(
-                                    color:
-                                        parseHexColor(cur) ??
-                                        const Color(0xFF8B5CF6),
-                                    disabled: !hasSelection,
-                                    onTap: hasSelection
-                                        ? () async {
-                                            final Color? picked =
-                                                await showColorPickerSheet(
-                                                  btnCtx,
-                                                  parseHexColor(cur) ??
-                                                      const Color(0xFF8B5CF6),
-                                                );
-                                            if (picked != null) {
-                                              c.setFigureColorOverride(
-                                                ptIdx,
-                                                colorToHex(picked),
-                                              );
-                                            }
-                                          }
+                                final hasSelection =
+                                    ptIdx != null &&
+                                    ptIdx >= 0 &&
+                                    ptIdx < c.figure.points.length;
+                                final cur = hasSelection
+                                    ? c.figureColorOverrideAt(ptIdx)
+                                    : null;
+                                return Tooltip(
+                                  message: hasSelection
+                                      ? (cur != null
+                                            ? 'Figure Color (tap to change, long-press to clear)'
+                                            : 'Figure Color')
+                                      : 'Figure Color',
+                                  child: GestureDetector(
+                                    onLongPress: hasSelection
+                                        ? () => c.clearFigureColorOverride(ptIdx)
                                         : null,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          Builder(
-                            builder: (btnCtx) {
-                              final ptIdx = c.selectedFigurePoint();
-                              final hasSelection =
-                                  ptIdx != null &&
-                                  ptIdx >= 0 &&
-                                  ptIdx < c.figure.points.length;
-                              final isCol =
-                                  hasSelection && c.isFigureCollision(ptIdx);
-                              return Tooltip(
-                                message: hasSelection
-                                    ? (isCol
-                                          ? 'Collision: ON (tap to disable)'
-                                          : 'Collision: OFF (tap to enable)')
-                                    : 'Collision (select a figure)',
-                                child: EditorIconButton(
-                                  icon: LucideIcons.shield,
-                                  color: kToolColor,
-                                  active: isCol,
-                                  disabled: !hasSelection,
-                                  onTap: hasSelection
-                                      ? () => c.toggleFigureCollision(ptIdx)
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                          Builder(
-                            builder: (btnCtx) {
-                              final seg = c.selectedSegmentId != null
-                                  ? c.figure.getSegment(c.selectedSegmentId!)
-                                  : null;
-                              final isImg = seg != null && seg.type == 'image';
-                              return Tooltip(
-                                message: isImg
-                                    ? 'Replace Image Asset'
-                                    : 'Replace Image (select an image segment)',
-                                child: EditorIconButton(
-                                  icon: LucideIcons.image,
-                                  color: kToolColor,
-                                  disabled: !isImg,
-                                  onTap: isImg
-                                      ? () async {
-                                          try {
-                                            final result =
-                                                await FilePicker.pickFiles(
-                                                  type: FileType.image,
-                                                  withData: true,
-                                                );
-                                            if (result != null &&
-                                                result.files.isNotEmpty) {
-                                              final bytes =
-                                                  result.files.first.bytes;
-                                              if (bytes != null) {
-                                                final ext =
-                                                    result
-                                                        .files
-                                                        .first
-                                                        .extension ??
-                                                    'png';
-                                                final b64 = base64Encode(bytes);
-                                                c.swapSegmentImage(
-                                                  seg.id,
-                                                  'data:image/$ext;base64,$b64',
+                                    child: ColorCircle(
+                                      color:
+                                          parseHexColor(cur) ??
+                                          const Color(0xFF8B5CF6),
+                                      disabled: !hasSelection,
+                                      onTap: hasSelection
+                                          ? () async {
+                                              final Color? picked =
+                                                  await showColorPickerSheet(
+                                                    btnCtx,
+                                                    parseHexColor(cur) ??
+                                                        const Color(0xFF8B5CF6),
+                                                  );
+                                              if (picked != null) {
+                                                c.setFigureColorOverride(
+                                                  ptIdx,
+                                                  colorToHex(picked),
                                                 );
                                               }
                                             }
-                                          } catch (err) {
-                                            debugPrint(
-                                              'Error replacing image: $err',
-                                            );
-                                          }
-                                        }
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                          Builder(
-                            builder: (btnCtx) {
-                              final seg = c.selectedSegmentId != null
-                                  ? c.figure.getSegment(c.selectedSegmentId!)
-                                  : null;
-                              final isSpriteImage =
-                                  seg != null &&
-                                  seg.type == 'image' &&
-                                  seg.imageDataList.length > 1;
-                              return Tooltip(
-                                message: isSpriteImage
-                                    ? 'Sprite Frame (tap to cycle)'
-                                    : 'Sprite Frame (select an image segment)',
-                                child: EditorIconButton(
-                                  icon: LucideIcons.images,
-                                  color: kToolColor,
-                                  disabled: !isSpriteImage,
-                                  onTap: isSpriteImage
-                                      ? () {
-                                          final curIdx =
-                                              c.figure.getSegmentImageIndex(
-                                                seg.id,
-                                                c.currentTime,
-                                              ) ??
-                                              seg.activeImageIndex;
-                                          final next =
-                                              (curIdx + 1) %
-                                              seg.imageDataList.length;
-                                          c.selectSegmentImage(seg.id, next);
-                                        }
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                          SizedBox(
-                            width: 88,
-                            height: 1,
-                            child: Center(
-                              child: Container(
-                                height: 1,
-                                width: 56,
-                                color: palette.border,
+                                          : null,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Copy Pose',
+                              child: EditorIconButton(
+                                icon: LucideIcons.copy,
+                                color: kToolColor,
+                                onTap: () {
+                                  c.copyFrame(c.currentTime);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Pose copied',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Color(0xFF22C55E),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
-                          ),
-                          Tooltip(
-                            message: 'Copy Pose',
-                            child: EditorIconButton(
-                              icon: LucideIcons.copy,
-                              color: kToolColor,
-                              onTap: () {
-                                c.copyFrame(c.currentTime);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Pose copied',
-                                      style: TextStyle(color: Colors.white),
+                            const SizedBox(height: 4),
+                            Tooltip(
+                              message: 'Paste Pose',
+                              child: EditorIconButton(
+                                icon: LucideIcons.clipboard_paste,
+                                color: kToolColor,
+                                disabled: !c.hasCopiedFrame,
+                                onTap: () {
+                                  c.pasteFrame(c.currentTime);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Pose pasted',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Color(0xFF22C55E),
+                                      duration: Duration(seconds: 1),
                                     ),
-                                    backgroundColor: Color(0xFF22C55E),
-                                    duration: Duration(seconds: 1),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                          Tooltip(
-                            message: 'Paste Pose',
-                            child: EditorIconButton(
-                              icon: LucideIcons.clipboard_paste,
-                              color: kToolColor,
-                              disabled: !c.hasCopiedFrame,
-                              onTap: () {
-                                c.pasteFrame(c.currentTime);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Pose pasted',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    backgroundColor: Color(0xFF22C55E),
-                                    duration: Duration(seconds: 1),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  )
-                : Row(
+                    )
+                  : Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1853,169 +1591,339 @@ class _EditorScreenState extends State<EditorScreen> {
                     active: _rightTab == _RightTab.layers,
                     onTap: () => _openRightTab(_RightTab.layers),
                   ),
-                  EditorIconButton(
-                    icon: LucideIcons.delete,
-                    color: kToolColor,
-                    onTap: _handleReset,
-                  ),
+
                 ],
               ),
             ),
           ),
 
-          // Zoom menu dropdown.
-          if (_showMenu)
+          // Horizontal prev/next sprite toolbar (appears when selected segment has sprites)
+          if (c.selectedSegmentId != null &&
+              c.figure.getSegment(c.selectedSegmentId!) != null &&
+              c.figure.getSegment(c.selectedSegmentId!)!.imageDataList.isNotEmpty)
             Positioned(
-              top: 56 + pad.top,
-              right: 4 + pad.right,
-              child: ConstrainedBox(
-                // Cap the height so long menus scroll instead of overflowing
-                // the screen.
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height - pad.top - 56,
+              bottom: 16 + pad.bottom,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _buildSpriteToolbar(
+                  c,
+                  c.figure.getSegment(c.selectedSegmentId!)!,
+                  palette,
                 ),
-                child: EditorPanel(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _MenuItem(
-                          icon: LucideIcons.upload,
-                          label: 'Import SVG',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            widget.controller.importSvg().then((msg) {
-                              if (msg != null) _showSnack(msg);
-                            });
-                          },
-                        ),
-                        _MenuItem(
-                          icon: LucideIcons.image,
-                          label: 'Import SVG as Image',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            widget.controller.importSvgAsImage().then((msg) {
-                              if (msg != null) _showSnack(msg);
-                            });
-                          },
-                        ),
-                        _MenuItem(
-                          icon: LucideIcons.user,
-                          label: 'Import Minecraft Skin',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            widget.controller.importMinecraftSkin(context).then(
-                              (msg) {
-                                if (msg != null) _showSnack(msg);
-                              },
-                            );
-                          },
-                        ),
-                        _MenuItem(
-                          icon: c.showConnectors ? LucideIcons.link : LucideIcons.link_2_off,
-                          label: c.showConnectors
-                              ? 'Hide Connectors'
-                              : 'Show Connectors',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            widget.controller.toggleConnectors();
-                          },
-                        ),
-                        _MenuItem(
-                          icon: c.showAxis ? LucideIcons.grid_3x3 : LucideIcons.grid_3x3,
-                          label: c.showAxis
-                              ? 'Hide Grid Axis'
-                              : 'Show Grid Axis',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            widget.controller.toggleAxis();
-                          },
-                        ),
-                        _MenuItem(
-                          icon: c.snapEnabled ? LucideIcons.grid_3x3 : LucideIcons.grid_3x3,
-                          label: c.snapEnabled ? 'Snap: On' : 'Snap: Off',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            widget.controller.toggleSnap();
-                            _showSnack(c.snapEnabled ? 'Snap on' : 'Snap off');
-                          },
-                        ),
-                        _MenuItem(
-                          icon: LucideIcons.circle_play,
-                          label: 'Preview',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            _openPreview();
-                          },
-                        ),
-                        _MenuItem(
-                          icon: LucideIcons.file_image,
-                          label: 'Export GIF',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            _exportGif();
-                          },
-                        ),
-                        _MenuItem(
-                          icon: LucideIcons.images,
-                          label: 'Export PNG Frames',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            _exportPngZip();
-                          },
-                        ),
-                        // Animation projects are finished movies (GIF/PNG output);
-                        // Presets/Figures are reusable assets and keep Lottie.
-                        if (!c.isAnimationProject)
-                          _MenuItem(
-                            icon: LucideIcons.film,
-                            label: 'Export Lottie',
-                            onTap: () {
-                              setState(() => _showMenu = false);
-                              _exportLottie();
-                            },
+              ),
+            ),
+
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpriteToolbar(EditorController c, Segment seg, AppPalette palette) {
+    final activeIdx = c.isAnimateMode
+        ? (c.figure.getSegmentImageIndex(seg.id, c.currentTime) ?? seg.activeImageIndex)
+        : seg.activeImageIndex;
+    final total = seg.imageDataList.length;
+    if (total <= 0) return const SizedBox.shrink();
+
+    return OverlayCapsule(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(
+            message: 'Previous Sprite',
+            child: EditorIconButton(
+              icon: LucideIcons.chevron_left,
+              color: kToolColor,
+              disabled: activeIdx <= 0,
+              onTap: () {
+                if (activeIdx > 0) {
+                  c.selectSegmentImage(seg.id, activeIdx - 1);
+                  setState(() {});
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 80,
+            height: 36,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'Sprite ${activeIdx + 1} / $total',
+                style: TextStyle(
+                  color: palette.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Tooltip(
+            message: 'Next Sprite',
+            child: EditorIconButton(
+              icon: LucideIcons.chevron_right,
+              color: kToolColor,
+              disabled: activeIdx >= total - 1,
+              onTap: () {
+                if (activeIdx < total - 1) {
+                  c.selectSegmentImage(seg.id, activeIdx + 1);
+                  setState(() {});
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openMoreMenu(EditorController c, AppPalette palette) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: palette.backgroundElement,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                border: Border.all(color: palette.backgroundSelected),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12, top: 4),
+                      decoration: BoxDecoration(
+                        color: palette.textSecondary.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "More Options",
+                          style: TextStyle(
+                            color: palette.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                        _MenuItem(
-                          icon: LucideIcons.bookmark,
-                          label: 'Poses',
-                          onTap: () {
-                            setState(() => _showMenu = false);
-                            _openPoseLibrary();
-                          },
                         ),
-                        _MenuItem(
-                          icon: LucideIcons.plus,
-                          label: 'Zoom In',
-                          onTap: () {
-                            c.zoomIn();
-                            setState(() => _showMenu = false);
-                          },
+                      ),
+                      IconButton(
+                        icon: const Icon(LucideIcons.x, size: 18),
+                        color: palette.textSecondary,
+                        onPressed: () => Navigator.of(context).pop(),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        ExpansionTile(
+                          initiallyExpanded: true,
+                          iconColor: kToolColor,
+                          collapsedIconColor: palette.textSecondary,
+                          title: Text('Canvas & View', style: TextStyle(color: palette.text, fontSize: 14, fontWeight: FontWeight.bold)),
+                          children: [
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.refresh_cw, size: 16, color: palette.textSecondary),
+                              title: Text('Trigger Redraw & Save Layer', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                c.forceUpdate();
+                                _showSnack('Redraw & layer triggered');
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.hand, size: 16, color: c.panEnabled ? const Color(0xFF22C55E) : palette.textSecondary),
+                              title: Text('Pan Canvas: ${c.panEnabled ? 'On' : 'Off'}', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                c.togglePanEnabled();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(c.showConnectors ? LucideIcons.link : LucideIcons.link_2_off, size: 16, color: palette.textSecondary),
+                              title: Text(c.showConnectors ? 'Hide Connectors' : 'Show Connectors', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                widget.controller.toggleConnectors();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.grid_3x3, size: 16, color: palette.textSecondary),
+                              title: Text(c.showAxis ? 'Hide Grid Axis' : 'Show Grid Axis', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                widget.controller.toggleAxis();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.grid_3x3, size: 16, color: palette.textSecondary),
+                              title: Text(c.snapEnabled ? 'Snap: On' : 'Snap: Off', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                widget.controller.toggleSnap();
+                                _showSnack(c.snapEnabled ? 'Snap on' : 'Snap off');
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.plus, size: 16, color: palette.textSecondary),
+                              title: Text('Zoom In', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                c.zoomIn();
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.minus, size: 16, color: palette.textSecondary),
+                              title: Text('Zoom Out', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                c.zoomOut();
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.maximize, size: 16, color: palette.textSecondary),
+                              title: Text('Reset Zoom', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                c.zoomReset();
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                          ],
                         ),
-                        _MenuItem(
-                          icon: LucideIcons.minus,
-                          label: 'Zoom Out',
-                          onTap: () {
-                            c.zoomOut();
-                            setState(() => _showMenu = false);
-                          },
+                        ExpansionTile(
+                          initiallyExpanded: false,
+                          iconColor: kToolColor,
+                          collapsedIconColor: palette.textSecondary,
+                          title: Text('Import & Export', style: TextStyle(color: palette.text, fontSize: 14, fontWeight: FontWeight.bold)),
+                          children: [
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.upload, size: 16, color: palette.textSecondary),
+                              title: Text('Import SVG', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                widget.controller.importSvg().then((msg) {
+                                  if (msg != null) _showSnack(msg);
+                                });
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.image, size: 16, color: palette.textSecondary),
+                              title: Text('Import SVG as Image', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                widget.controller.importSvgAsImage().then((msg) {
+                                  if (msg != null) _showSnack(msg);
+                                });
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.user, size: 16, color: palette.textSecondary),
+                              title: Text('Import Minecraft Skin', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                widget.controller.importMinecraftSkin(context).then((msg) {
+                                  if (msg != null) _showSnack(msg);
+                                });
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.file_image, size: 16, color: palette.textSecondary),
+                              title: Text('Export GIF', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                _exportGif();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.images, size: 16, color: palette.textSecondary),
+                              title: Text('Export PNG Frames', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                _exportPngZip();
+                              },
+                            ),
+                            if (!c.isAnimationProject)
+                              ListTile(
+                                dense: true,
+                                leading: Icon(LucideIcons.film, size: 16, color: palette.textSecondary),
+                                title: Text('Export Lottie', style: TextStyle(color: palette.text, fontSize: 13)),
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  _exportLottie();
+                                },
+                              ),
+                          ],
                         ),
-                        _MenuItem(
-                          icon: LucideIcons.maximize,
-                          label: 'Reset Zoom',
-                          onTap: () {
-                            c.zoomReset();
-                            setState(() => _showMenu = false);
-                          },
+                        ExpansionTile(
+                          initiallyExpanded: false,
+                          iconColor: kToolColor,
+                          collapsedIconColor: palette.textSecondary,
+                          title: Text('Preview & Library', style: TextStyle(color: palette.text, fontSize: 14, fontWeight: FontWeight.bold)),
+                          children: [
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.circle_play, size: 16, color: palette.textSecondary),
+                              title: Text('Preview', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                _openPreview();
+                              },
+                            ),
+                            ListTile(
+                              dense: true,
+                              leading: Icon(LucideIcons.bookmark, size: 16, color: palette.textSecondary),
+                              title: Text('Poses', style: TextStyle(color: palette.text, fontSize: 13)),
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                _openPoseLibrary();
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-            ),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 

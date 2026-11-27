@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'update_model.dart';
+import '../../core/app_version.dart';
 
 class UpdateService {
   final http.Client _client = http.Client();
@@ -28,7 +29,11 @@ class UpdateService {
       if (latest == null || apkUrl == null) return null;
 
       final info = await PackageInfo.fromPlatform();
-      if (AppUpdate.isNewer(latest, info.version)) {
+      final currentVersion = (info.version.isNotEmpty && info.version != '0.0.1') ? info.version : appVersion;
+      final currentBuild = (info.buildNumber.isNotEmpty && info.buildNumber != '0') ? info.buildNumber : appBuildNumber;
+      final currentFull = '$currentVersion+$currentBuild';
+
+      if (AppUpdate.isNewer(latest, currentFull)) {
         return AppUpdate(
           latestVersion: latest,
           apkUrl: apkUrl,

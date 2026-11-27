@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
+import 'package:smooth_corner/smooth_corner.dart';
 
 import '../../../core/models/figure.dart';
 import '../controllers/editor_controller.dart';
@@ -142,42 +143,48 @@ class _FramesScreenState extends State<FramesScreen> {
       onTap: () => _goToFrame(frame),
       onLongPress: () => _showFrameMenu(frame, t),
       onSecondaryTap: () => _showFrameMenu(frame, t),
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: palette.backgroundElement,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : palette.border,
-            width: isSelected ? 2 : 1,
-          ),
+      child: SmoothContainer(
+        smoothness: 1.0,
+        borderRadius: BorderRadius.circular(12),
+        color: palette.backgroundElement,
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF3B82F6) : palette.border,
+          width: isSelected ? 2 : 1,
         ),
-        child: Column(
-          children: [
-            Expanded(
-              child: FigurePreview(
-                figure: _thumbFor(frame),
-                time: t,
-                enableFrameOverrides: true,
-              ),
-            ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              color: palette.background,
-              child: Text(
-                '${frame + 1}',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isSelected
-                      ? const Color(0xFF60A5FA)
-                      : palette.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: FigurePreview(
+                  figure: _thumbFor(frame),
+                  time: t,
+                  enableFrameOverrides: true,
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                top: 6,
+                left: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: palette.background.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${frame + 1}',
+                    style: TextStyle(
+                      color: isSelected
+                          ? const Color(0xFF60A5FA)
+                          : palette.text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

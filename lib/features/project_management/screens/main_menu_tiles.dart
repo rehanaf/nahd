@@ -60,14 +60,14 @@ class _ProjectCardTileState extends State<_ProjectCardTile> {
               child: InkWell(
                 onTap: widget.onOpen,
                 borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
+                child: SmoothClipRRect(
+                  smoothness: 1.0,
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: palette.backgroundSelected),
+                  child: Container(
                     color: palette.backgroundElement,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: palette.backgroundSelected),
+                    child: FigurePreview(figure: _figure),
                   ),
-                  child: FigurePreview(figure: _figure),
                 ),
               ),
             ),
@@ -185,49 +185,49 @@ class _GroupCardTileState extends State<_GroupCardTile> {
               child: InkWell(
                 onTap: widget.onOpen,
                 borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
+                child: SmoothClipRRect(
+                  smoothness: 1.0,
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: palette.backgroundSelected),
+                  child: Container(
                     color: palette.backgroundElement,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: palette.backgroundSelected),
+                    child: _previews.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  LucideIcons.folder,
+                                  size: 26,
+                                  color: palette.textSecondary,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${widget.count} '
+                                  '${widget.count == 1 ? 'project' : 'projects'}',
+                                  style: TextStyle(
+                                      color: palette.textSecondary, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: GridView.count(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 2,
+                              crossAxisSpacing: 2,
+                              physics: const NeverScrollableScrollPhysics(),
+                              children: [
+                                for (var i = 0; i < 4; i++)
+                                  if (i < _previews.length)
+                                    FigurePreview(figure: _previews[i])
+                                  else
+                                    const ColoredBox(color: Colors.white),
+                              ],
+                            ),
+                          ),
                   ),
-                  child: _previews.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                LucideIcons.folder,
-                                size: 26,
-                                color: palette.textSecondary,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${widget.count} '
-                                '${widget.count == 1 ? 'project' : 'projects'}',
-                                style: TextStyle(
-                                    color: palette.textSecondary, fontSize: 11),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: GridView.count(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 2,
-                            crossAxisSpacing: 2,
-                            physics: const NeverScrollableScrollPhysics(),
-                            children: [
-                              for (var i = 0; i < 4; i++)
-                                if (i < _previews.length)
-                                  FigurePreview(figure: _previews[i])
-                                else
-                                  const ColoredBox(color: Colors.white),
-                            ],
-                          ),
-                        ),
                 ),
               ),
             ),

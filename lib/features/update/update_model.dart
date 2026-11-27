@@ -11,17 +11,27 @@ class AppUpdate {
   });
 
   /// Bandingkin dua versi (semver-ish: major.minor.patch, boleh ada "+build").
-  /// Return true kalau [a] lebih baru dari [b].
-  static bool isNewer(String a, String b) {
-    List<int> parse(String v) =>
-        v.split('+').first.split('.').map(int.parse).toList();
-    final av = parse(a);
-    final bv = parse(b);
+  /// Return true kalau [latest] lebih baru dari [current].
+  static bool isNewer(String latest, String current) {
+    List<int> parseVersion(String v) =>
+        v.split('+').first.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    int parseBuild(String v) {
+      final parts = v.split('+');
+      if (parts.length > 1) {
+        return int.tryParse(parts[1]) ?? 0;
+      }
+      return 0;
+    }
+
+    final lv = parseVersion(latest);
+    final cv = parseVersion(current);
     for (var i = 0; i < 3; i++) {
-      final x = i < av.length ? av[i] : 0;
-      final y = i < bv.length ? bv[i] : 0;
+      final x = i < lv.length ? lv[i] : 0;
+      final y = i < cv.length ? cv[i] : 0;
       if (x != y) return x > y;
     }
-    return false;
+    final lb = parseBuild(latest);
+    final cb = parseBuild(current);
+    return lb > cb;
   }
 }

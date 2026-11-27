@@ -26,20 +26,40 @@ class FigureCanvasPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    try {
+      _paintInternal(canvas, size);
+    } catch (e, st) {
+      canvas.drawRect(Offset.zero & size, Paint()..color = Colors.red.shade900);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'PAINT ERROR:\n$e',
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width - 40);
+      tp.paint(canvas, const Offset(20, 20));
+      debugPrint('PAINT ERROR: $e\n$st');
+    }
+  }
+
+  void _paintInternal(Canvas canvas, Size size) {
     final cam = c.camera;
+    final zoom = cam.zoom.isFinite && cam.zoom > 0 ? cam.zoom : 0.8;
+    final cWidth = fig.canvasWidth.isFinite && fig.canvasWidth > 0 ? fig.canvasWidth : 800.0;
+    final cHeight = fig.canvasHeight.isFinite && fig.canvasHeight > 0 ? fig.canvasHeight : 600.0;
 
     // Background (Workspace outside canvas).
     canvas.drawRect(Offset.zero & size, Paint()..color = palette.backgroundElement);
 
     canvas.save();
     canvas.translate(size.width / 2 + cam.x, size.height / 2 + cam.y);
-    canvas.scale(cam.zoom);
+    canvas.scale(zoom);
 
     // Canvas bounds rect.
     final canvasRect = Rect.fromCenter(
       center: Offset.zero,
-      width: fig.canvasWidth,
-      height: fig.canvasHeight,
+      width: cWidth,
+      height: cHeight,
     );
     canvas.drawRect(
       canvasRect,
@@ -58,7 +78,7 @@ class FigureCanvasPainter extends CustomPainter {
         ..color =
             const Color(0x66EF4444) // Semi-transparent red
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0 / cam.zoom;
+        ..strokeWidth = 1.0 / zoom;
       // Y-axis (x=0)
       canvas.drawLine(const Offset(0, -9999), const Offset(0, 9999), axisPaint);
       // X-axis (y=0)
@@ -71,9 +91,9 @@ class FigureCanvasPainter extends CustomPainter {
         ..color =
             const Color(0x223B82F6) // faint blue
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0 / cam.zoom;
-      final halfW = fig.canvasWidth / 2;
-      final halfH = fig.canvasHeight / 2;
+        ..strokeWidth = 1.0 / zoom;
+      final halfW = cWidth / 2;
+      final halfH = cHeight / 2;
       for (var x = -halfW; x <= halfW; x += g) {
         canvas.drawLine(Offset(x, -halfH), Offset(x, halfH), gridPaint);
       }
@@ -283,7 +303,10 @@ class FigureCanvasPainter extends CustomPainter {
       // into ONE layer, then composite the layer once with [alpha]. Applying
       // alpha per segment makes overlaps accumulate (0.3 -> 0.51 -> 0.66 ...)
       // and look thicker; this keeps every part of the ghost evenly faint.
-      canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
+      canvas.saveLayer(
+        const Rect.fromLTRB(-100000, -100000, 100000, 100000),
+        Paint()..color = Color.fromRGBO(255, 255, 255, alpha),
+      );
 
       for (final seg in fig.segments) {
         final style = fig.styleFor(seg, ghostTime, enabled: c.isAnimateMode);

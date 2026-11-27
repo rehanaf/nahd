@@ -107,11 +107,15 @@ class _FigureCanvasState extends State<FigureCanvas> {
   // Coordinate helpers
   // -------------------------------------------------------------------------
 
-  Offset _screenToWorld(Offset s, Size size, CameraTransform cam) =>
-      Offset(
-        (s.dx - size.width / 2 - cam.x) / cam.zoom,
-        (s.dy - size.height / 2 - cam.y) / cam.zoom,
-      );
+  Offset _screenToWorld(Offset s, Size size, CameraTransform cam) {
+    final w = size.width > 0 ? size.width : (_canvasSize.width > 0 ? _canvasSize.width : 800.0);
+    final h = size.height > 0 ? size.height : (_canvasSize.height > 0 ? _canvasSize.height : 600.0);
+    final z = cam.zoom.isFinite && cam.zoom > 0 ? cam.zoom : 0.8;
+    return Offset(
+      (s.dx - w / 2 - cam.x) / z,
+      (s.dy - h / 2 - cam.y) / z,
+    );
+  }
 
   bool _visibleAt(Figure fig, int pointIdx, double t) {
     if (pointIdx < 0 || pointIdx >= fig.points.length) return true;
